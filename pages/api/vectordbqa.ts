@@ -61,6 +61,7 @@ export default async function handler(
     });
   } catch (err) {
     console.error(err);
+    console.log("Error in LLM, sending DONE and closing connection")
   } finally {
     sendData(JSON.stringify({ data: "DONE" }));
     res.end();
