@@ -12,6 +12,12 @@ export default async function handler(
 ) {
   // Inputs 
   const prompt = req.body.prompt;
+  const openAIApiKey = req.body.apiKey;
+
+  // If API key is null, set it to the environment variable
+  if (openAIApiKey) {
+    process.env.OPENAI_API_KEY = openAIApiKey;
+  }
 
   // Vector DB
   const pinecone = new PineconeClient();
