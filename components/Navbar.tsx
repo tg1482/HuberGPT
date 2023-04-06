@@ -1,7 +1,7 @@
 import { IconExternalLink } from "@tabler/icons-react";
 import Image from "next/image";
 import { FC } from "react";
-import king from "../public/lex.jpeg";
+import king from "../public/hubermanlabicon.jpeg";
 
 export const Navbar: FC = () => {
   return (
@@ -14,20 +14,20 @@ export const Navbar: FC = () => {
           <Image
             className="hidden sm:flex"
             src={king}
-            alt="The Network State GPT"
+            alt="GPT powered chat based on Huberman Lab podcast"
             height={40}
           />
-          <div className="ml-2">Lex GPT</div>
+          <div className="ml-2">HuberGPT</div>
         </a>
       </div>
       <div>
         <a
           className="flex items-center hover:opacity-50"
-          href="https://lexfridman.com/podcast/"
+          href="https://hubermanlab.com/"
           target="_blank"
           rel="noreferrer"
         >
-          <div className="hidden sm:flex">lexfridman.com</div>
+          <div className="hidden sm:flex">hubermanlab.com</div>
 
           <IconExternalLink
             className="ml-1"

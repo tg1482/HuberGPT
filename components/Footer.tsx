@@ -1,4 +1,4 @@
-import { IconBrandGithub, IconBrandTwitter } from "@tabler/icons-react";
+import { IconBrandGithub,IconBrandTwitter } from "@tabler/icons-react";
 import { FC } from "react";
 
 export const Footer: FC = () => {
@@ -10,29 +10,48 @@ export const Footer: FC = () => {
         Created by
         <a
           className="hover:opacity-50 mx-1"
+          href="https://twitter.com/tanmayg172"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Tanmay Gupta
+        </a>
+        based on
+        <a
+          className="hover:opacity-50 ml-1"
+          href="https://twitter.com/hubermanlab"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Prof Andrew Huberman's
+        </a>
+        {`'s blog`}
+        <a
+          className="hover:opacity-50 ml-1"
+          href="https://hubermanlab.com/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Podcast
+        </a>
+        .
+        Credits due to
+        <a
+          className="hover:opacity-50 mx-1"
           href="https://twitter.com/RLanceMartin"
           target="_blank"
           rel="noreferrer"
         >
           Lance Martin
         </a>
-        based on
+        for his open source
         <a
           className="hover:opacity-50 ml-1"
-          href="https://twitter.com/lexfridman"
+          href="https://github.com/PineappleExpress808/lex-gpt"
           target="_blank"
           rel="noreferrer"
         >
-          Lex Fridman
-        </a>
-        {`'s blog`}
-        <a
-          className="hover:opacity-50 ml-1"
-          href="https://lexfridman.com/podcast/"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Podcast
+          contributions
         </a>
         .
       </div>
@@ -40,7 +59,7 @@ export const Footer: FC = () => {
       <div className="flex space-x-4">
         <a
           className="flex items-center hover:opacity-50"
-          href="https://twitter.com/RLanceMartin"
+          href="https://twitter.com/tanmayg172"
           target="_blank"
           rel="noreferrer"
         >
@@ -49,7 +68,7 @@ export const Footer: FC = () => {
 
         <a
           className="flex items-center hover:opacity-50"
-          href="https://github.com/PineappleExpress808/lex-gpt"
+          href="https://github.com/tg1482"
           target="_blank"
           rel="noreferrer"
         >

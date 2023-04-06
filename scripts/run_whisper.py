@@ -12,7 +12,7 @@ logging.basicConfig(filename='whisper.log', filemode='w', level=logging.DEBUG)
 new_ep=pd.read_csv("audio_transcription/episodes.csv",index_col=None)
 
 # Run whisper on each audio file
-for ix in new_ep.index:
+for ix in new_ep.index[3:]:
 
     # get data 
     ep_number=int(new_ep.loc[ix,'number'])

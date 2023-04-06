@@ -2,7 +2,7 @@ export enum OpenAIModel {
   DAVINCI_TURBO = "gpt-3.5-turbo"
 }
 
-export type LEXChunk = {
+export type HuberbotChunk = {
   pageContent: string;
   source: string;
   metadata: Metadata;

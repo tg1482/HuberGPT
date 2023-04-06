@@ -1,0 +1,22 @@
+name: huberbot_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - pip
+  - ffmpeg
+  - pip:
+    - transformers
+    - openai
+    - langchain
+    - bs4
+    - httplib2
+    - pinecone-client
+    - pandas
+    - numpy
+    - matplotlib
+    - seaborn
+    - youtube-search-python
+    - yt-dlp
+    - openai-whisper
