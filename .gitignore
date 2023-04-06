@@ -1,8 +1,5 @@
 node_modules
 
-# ignore all files in the public folder
-/public
-
 # ignore all files in the .next folder
 /.next
 
