@@ -1,0 +1,32 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User_Dim {
+  id            Int         @id @default(autoincrement())
+  email         String      @unique
+  queries       Query_Fact[]
+  createdAt     DateTime    @default(now())
+  subcriptionId Int
+  subcription   Subcription @relation(fields: [subcriptionId], references: [id])
+}
+
+model Query_Fact {
+  id            Int      @id @default(autoincrement())
+  content       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  userId        Int
+  user          User_Dim @relation(fields: [userId], references: [id])
+}
+
+model Subcription {
+  id      Int       @id @default(autoincrement())
+  name    String
+  users   User_Dim[]
+}
