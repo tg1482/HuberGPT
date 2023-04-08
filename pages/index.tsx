@@ -1,17 +1,17 @@
 import { Answer } from "@/components/Answer/Answer";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
-import Signup from "@/components/Signup";
 import { HuberbotChunk } from "@/types";
 import { IconArrowRight,IconExternalLink,IconSearch } from "@tabler/icons-react";
 import Head from "next/head";
 import Image from "next/image";
 import { KeyboardEvent,useEffect,useRef,useState } from "react";
 import { fetchEventSource } from '@microsoft/fetch-event-source';
-import { signIn,signOut,useSession,SessionProvider,getCsrfToken } from "next-auth/react";
+import { signIn,signOut,getSession,useSession,SessionProvider,getCsrfToken } from "next-auth/react";
 import { Session } from "next-auth";
 import { useRouter } from "next/router";
 import { saveQuery } from "@/lib/db";
+import { loadStripe } from "@stripe/stripe-js";
 
 
 
@@ -33,6 +33,7 @@ function Home() {
   const [chunks,setChunks] = useState<HuberbotChunk[]>([]);
   const [answer,setAnswer] = useState<string>("");
   const [loading,setLoading] = useState<boolean>(false);
+  const [error,setError] = useState<string | null>(null);
 
   const [mode,setMode] = useState<"search" | "chat">("chat");
   const [queryCount,setQueryCount] = useState<number>(0);
@@ -182,13 +183,104 @@ function Home() {
     setShowPlans(false);
   };
 
-  // const handleSignUp = () => {
-  //   router.push("/signup");
-  // };
 
-  const handleSignIn = () => {
-    signIn("email",{ email,password });
+  const handleSignIn = async () => {
+    setError(null);
+
+    const result = await signIn("credentials",{
+      redirect: false,
+      email,
+      password,
+    });
+
+    if (result?.error) {
+      setError(result.error);
+    } else {
+      const session = await getSession();
+      if (session) {
+        // The user is now signed in; handle the signed-in state here.
+        console.log("Session:",session);
+
+        console.log("User is signed in:",session.user);
+      } else {
+        // The sign-in attempt failed; handle the error here.
+        setError("Something going on");
+      }
+    }
   };
+
+
+  const handleFreeSignup = async () => {
+    try {
+      // check email and password are valid
+      if (email === '' || password === '') {
+        throw new Error('Please enter a valid email and password.');
+      }
+
+      const response = await fetch('/api/signup',{
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email,password }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error);
+      }
+
+      console.log("User created successfully!");
+
+      const responseBody = await response.json();
+      const userId = parseInt(responseBody.userId);
+
+      await createSubscription("1",userId);
+
+      console.log("Subscription created successfully!");
+
+      // router.push("/signup/free");
+    } catch (err: any) {
+      console.error('Error:',err.message);
+      alert(err.message);
+    }
+  };
+
+  const createSubscription = async (planId: string,userId: number) => {
+    const res = await fetch("/api/create-subscription",{
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ planId,userId }),
+    });
+
+    const data = await res.json();
+
+    if (data.status === "success" && planId === "2") {
+      redirectToCheckout(data.priceId);
+    }
+  };
+
+
+  const redirectToCheckout = async (priceId: string) => {
+    const stripePromise = loadStripe("your_stripe_public_key");
+
+    const stripe = await stripePromise;
+    if (stripe) {
+      const { error } = await stripe.redirectToCheckout({
+        lineItems: [{ price: priceId,quantity: 1 }],
+        mode: "subscription",
+        successUrl: "https://example.com/success",
+        cancelUrl: "https://example.com/cancel",
+      });
+
+      if (error) {
+        console.error("Error:",error);
+      }
+    }
+  };
+
 
 
   useEffect(() => {
@@ -308,10 +400,31 @@ function Home() {
                         Log In
                       </button>
                     </div>
+                    {error && (
+                      <div className="mt-2 text-red-600">{error}</div>
+                    )}
                   </div>
                 )}
 
-                {showPlans && <Signup />}
+                {showPlans && (
+                  <div className="flex flex-col items-center">
+                    <h1 className="text-3xl font-bold mb-4"> </h1>
+                    <div className="flex space-x-4">
+                      <button
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                        onClick={handleFreeSignup}
+                      >
+                        5 Free Questions
+                      </button>
+                      <button
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                        onClick={() => redirectToCheckout("price_id_50_queries")}
+                      >
+                        $5 for 50 Questions
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {useAPIKey && (
                   <div className="mt-2">
