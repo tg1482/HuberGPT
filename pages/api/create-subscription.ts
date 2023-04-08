@@ -19,7 +19,7 @@ export default async function handler(
             if (planId == 1) {
                 plan = 'Free';
                 price = 0;
-                queriesAllowed = 10;
+                queriesAllowed = 5;
                 queriesMade = 0;
             } else if (planId == 2) {
                 plan = 'Premium';

@@ -19,9 +19,27 @@ export default NextAuth({
                 });
 
                 if (user && (await bcrypt.compare(credentials.password, user.password))) {
+                    // query the subscriptionFacts table to see if the user has a subscription
+                    const subscription = await prisma.subscriptionFact.findFirst({
+                        where: {
+                            userId: user.id,
+                            active: true, // replace with the name of the boolean column that represents subscription status
+                        },
+                        orderBy: {
+                            updatedAt: 'desc', // replace with the name of the column that holds the update time
+                        },
+                        take: 1,
+                    });
+
+                    // if the user has a subscription, 
+                    const queriesAllowed = subscription.queriesAllowed ? subscription.queriesAllowed : 0;
+                    const queriesMade = subscription.queriesMade ? subscription.queriesMade : 0;
+
                     return {
                         id: user.id,
                         email: user.email,
+                        queriesAllowed: queriesAllowed,
+                        queriesMade: queriesMade,
                     };
                 } else {
                     return {
@@ -40,17 +58,18 @@ export default NextAuth({
             if (user) {
                 token.id = user.id;
                 token.email = user.email;
+                token.queriesAllowed = user.queriesAllowed;
+                token.queriesMade = user.queriesMade;
             }
             return token;
         },
 
         async session({ session, token, user }) {
-            console.log("session", session);
-            console.log("token", token);
-            console.log("user", user);
             if (token) {
                 session.user.id = token.id;
                 session.user.email = token.email;
+                session.user.queriesAllowed = token.queriesAllowed;
+                session.user.queriesMade = token.queriesMade;
             }
             return session;
         }

@@ -9,6 +9,16 @@ export type HuberbotChunk = {
   length: number;
 };
 
+export interface DefaultSession {
+  user: {
+    id: null | string;
+    email: null | string;
+    queriesAllowed: number;
+    queriesMade: number;
+  };
+  expires: string;
+};
+
 interface Metadata {
   id: string;
   title: string;

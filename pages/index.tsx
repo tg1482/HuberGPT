@@ -1,7 +1,7 @@
 import { Answer } from "@/components/Answer/Answer";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
-import { HuberbotChunk } from "@/types";
+import { HuberbotChunk,DefaultSession } from "@/types";
 import { IconArrowRight,IconExternalLink,IconSearch } from "@tabler/icons-react";
 import Head from "next/head";
 import Image from "next/image";
@@ -10,18 +10,30 @@ import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { signIn,signOut,getSession,useSession,SessionProvider,getCsrfToken } from "next-auth/react";
 import { Session } from "next-auth";
 import { useRouter } from "next/router";
-import { saveQuery } from "@/lib/db";
 import { loadStripe } from "@stripe/stripe-js";
 
+// Default session
 
+const defaultSession = {
+  user: {
+    id: -99,
+    email: null,
+    queriesAllowed: 2,
+    queriesMade: 0,
+  },
+  expires: new Date().toISOString(),
+};
 
-function HomeWrapper({ session }: { session: Session }) {
+type HubergptSession = Session | DefaultSession;
+
+function HomeWrapper({ session }: { session: HubergptSession }) {
   return (
-    <SessionProvider session={session}>
+    <SessionProvider session={session ? session : defaultSession}>
       <Home />
     </SessionProvider>
   );
 }
+
 
 export default HomeWrapper;
 
@@ -46,9 +58,12 @@ function Home() {
   const [useAPIKey,setUseAPIKey] = useState<boolean>(false);
 
   const [apiKey,setApiKey] = useState<string>("");
-  const [email,setEmail] = useState("");
-  const [password,setPassword] = useState("");
+  const [emailInput,setEmailInput] = useState("");
+  const [passwordInput,setPasswordInput] = useState("");
 
+  const [userId,setUserId] = useState<number>(-99);
+  const [userEmail,setUserEmail] = useState<string | null>(null);
+  const [userSignedIn,setUserSignedIn] = useState<boolean>(false);
   const [userAuthorized,setUserAuthorized] = useState<boolean>(false);
   const router = useRouter();
 
@@ -56,28 +71,36 @@ function Home() {
 
   console.log(session);
 
+  const setSessionState = (user: any) => {
+    console.log("Setting stage",user)
+    if (user) {
+      setFreeQueries(user.queriesAllowed);
+      setQueryCount(user.queriesMade);
+      setUserId(user.id);
+      if (user.id !== -99) {
+        setUserSignedIn(true);
+      };
+      setUserEmail(user.email);
+    }
+  };
+
   useEffect(() => {
-    if (session) {
-      setFreeQueries(1);
+    if (session && session.user) {
+      setSessionState(session.user);
     }
   },[session]);
 
   // Handle answer 
   const handleAnswer = async () => {
 
-    // if (queryCount >= freeQueries && !session) {
-    //   handleSignIn();
-    //   return;
-    // }
-
-    if (session && session.user) {
-      saveQuery({
-        user_id: session.user.id as string,
-        query: query as string,
-        answer: answer as string,
-        created_at: new Date() as Date,
-      });
-    }
+    // save query to db using save-query endpoint
+    const save_query = await fetch("/api/save-query",{
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ query,userId })
+    });
 
 
     setAnswer("");
@@ -189,8 +212,8 @@ function Home() {
 
     const result = await signIn("credentials",{
       redirect: false,
-      email,
-      password,
+      emailInput,
+      passwordInput,
     });
 
     if (result?.error) {
@@ -199,9 +222,10 @@ function Home() {
       const session = await getSession();
       if (session) {
         // The user is now signed in; handle the signed-in state here.
-        console.log("Session:",session);
-
         console.log("User is signed in:",session.user);
+        setSessionState(session.user);
+        setUserSignedIn(true);
+        setShowSettings(false);
       } else {
         // The sign-in attempt failed; handle the error here.
         setError("Something going on");
@@ -209,11 +233,15 @@ function Home() {
     }
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
 
   const handleFreeSignup = async () => {
     try {
       // check email and password are valid
-      if (email === '' || password === '') {
+      if (emailInput === '' || passwordInput === '') {
         throw new Error('Please enter a valid email and password.');
       }
 
@@ -222,7 +250,7 @@ function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email,password }),
+        body: JSON.stringify({ emailInput,passwordInput }),
       });
 
       if (!response.ok) {
@@ -239,7 +267,9 @@ function Home() {
 
       console.log("Subscription created successfully!");
 
-      // router.push("/signup/free");
+      // sign in
+      await handleSignIn();
+
     } catch (err: any) {
       console.error('Error:',err.message);
       alert(err.message);
@@ -368,42 +398,57 @@ function Home() {
                   </div>
                 </div>
 
-                {useEmailPassword && (
+                {userSignedIn ? (
                   <div className="mt-2">
-                    <div>Email</div>
-                    <input
-                      type="email"
-                      placeholder="Email"
-                      className="max-w-[400px] block w-full rounded-md border border-gray-300 p-2 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                    <div className="mt-2">Password</div>
-                    <input
-                      type="password"
-                      placeholder="Password"
-                      className="max-w-[400px] block w-full rounded-md border border-gray-300 p-2 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                    <div className="flex space-x-4">
-                      <button
-                        className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                        onClick={() => setShowPlans(true)}
-                      >
-                        Sign Up
-                      </button>
-                      <button
-                        className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                        onClick={handleSignIn}
-                      >
-                        Log In
-                      </button>
+                    <div className="mt-2">
+                      Logged In as {userEmail}
                     </div>
-                    {error && (
-                      <div className="mt-2 text-red-600">{error}</div>
-                    )}
+                    <button
+                      // className="mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+                      className="flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
+                      onClick={handleSignOut}
+                    >
+                      Logout
+                    </button>
                   </div>
+                ) : (
+                  useEmailPassword && (
+                    <div className="mt-2">
+                      <div>Email</div>
+                      <input
+                        type="email"
+                        placeholder="Email"
+                        className="max-w-[400px] block w-full rounded-md border border-gray-300 p-2 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
+                        value={emailInput}
+                        onChange={(e) => setEmailInput(e.target.value)}
+                      />
+                      <div className="mt-2">Password</div>
+                      <input
+                        type="password"
+                        placeholder="Password"
+                        className="max-w-[400px] block w-full rounded-md border border-gray-300 p-2 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
+                        value={passwordInput}
+                        onChange={(e) => setPasswordInput(e.target.value)}
+                      />
+                      <div className="flex space-x-4">
+                        <button
+                          className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                          onClick={() => setShowPlans(true)}
+                        >
+                          Sign Up
+                        </button>
+                        <button
+                          className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                          onClick={handleSignIn}
+                        >
+                          Log In
+                        </button>
+                      </div>
+                      {error && (
+                        <div className="mt-2 text-red-600">{error}</div>
+                      )}
+                    </div>
+                  )
                 )}
 
                 {showPlans && (
@@ -586,7 +631,7 @@ function Home() {
           </div>
         </div>
         <Footer />
-      </div>
+      </div >
     </>
   );
 }
