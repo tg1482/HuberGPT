@@ -71,11 +71,20 @@ function Home() {
 
   console.log(session);
 
-  const setSessionState = (user: any) => {
+  const setSessionState = async (user: any) => {
     console.log("Setting stage",user)
     if (user) {
-      setFreeQueries(user.queriesAllowed);
-      setQueryCount(user.queriesMade);
+      if (user.id !== -99) {
+        const response = await fetch(`/api/get-query-counts?userId=${user.id}`);
+        if (response.ok) {
+          const { queriesMade,queriesAllowed } = await response.json();
+          setFreeQueries(queriesAllowed);
+          setQueryCount(queriesMade);
+        }
+      } else {
+        setFreeQueries(user.queriesAllowed);
+        setQueryCount(user.queriesMade);
+      }
       setUserId(user.id);
       if (user.id !== -99) {
         setUserSignedIn(true);
@@ -84,11 +93,31 @@ function Home() {
     }
   };
 
+
   useEffect(() => {
     if (session && session.user) {
       setSessionState(session.user);
     }
   },[session]);
+
+
+  // Save session with the latest values when the user leaves the tab
+  useEffect(() => {
+    const saveSession = () => {
+      if (userId == -99 && session) {
+        sessionStorage.setItem(
+          "session",
+          JSON.stringify({ ...session,user: { ...session.user,queriesAllowed: freeQueries,queriesMade: queryCount } })
+        );
+      }
+    };
+
+    window.addEventListener("beforeunload",saveSession);
+
+    return () => {
+      window.removeEventListener("beforeunload",saveSession);
+    };
+  },[freeQueries,queryCount,session,userId]);
 
   // Handle answer 
   const handleAnswer = async () => {
@@ -164,24 +193,18 @@ function Home() {
 
 
   const getUserAuthorization = () => {
-    if (queryCount < freeQueries) {
-      return true;
+    if (userId === -99) {
+      return queryCount < freeQueries;
     } else {
-      if (useAPIKey && apiKey.length === 51) {
-        setOpenAPILimit(false);
-        return true;
-      } else {
-        setOpenAPILimit(true);
-        return false;
-      }
+      return queryCount < freeQueries || (!apiKey && queryCount < freeQueries + 1);
     }
   };
+
 
 
   const postCompletion = (apiKey: string,queryCount: number) => {
     setQueryCount(queryCount + 1);
     localStorage.setItem("QUERY_COUNT",queryCount.toString());
-    setUserAuthorized(getUserAuthorization());
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -201,7 +224,6 @@ function Home() {
     // localStorage.setItem("PG_MODE",mode);
 
     setShowSettings(false);
-    setUserAuthorized(getUserAuthorization());
     inputRef.current?.focus();
   };
 
@@ -252,7 +274,7 @@ function Home() {
   };
 
 
-  const handleFreeSignup = async () => {
+  const signUp = async (email: string,password: string) => {
     try {
       // check email and password are valid
       if (email === '' || password === '') {
@@ -272,58 +294,82 @@ function Home() {
         throw new Error(error.error);
       }
 
-      console.log("User created successfully!");
+      console.log('User created successfully!');
 
       const responseBody = await response.json();
       const userId = parseInt(responseBody.userId);
 
-      await createSubscription("1",userId);
+      return userId;
+    } catch (err: any) {
+      console.error('Error:',err.message);
+      throw new Error(err.message);
+    }
+  };
 
-      console.log("Subscription created successfully!");
+  const handleFreeSignUp = async () => {
+    try {
+      const userId = await signUp(email,password);
+
+      await createSubscription('1',userId);
+
+      console.log('Subscription created successfully!');
 
       // sign in
       await handleSignIn();
-
     } catch (err: any) {
       console.error('Error:',err.message);
       alert(err.message);
     }
   };
 
-  const createSubscription = async (planId: string,userId: number) => {
+
+  const handlePaidSignUp = async () => {
+    try {
+      const userId = await signUp(email,password);
+      const priceId = "price_1MujjWCXd0dypVQUNFQ87bkn"; // replace with the actual price ID
+      await collectPayment(priceId);
+      await createSubscription(priceId,userId);
+      console.log("Subscription created successfully!");
+      await handleSignIn();
+    } catch (err: any) {
+      console.error('Error:',err.message);
+      alert(err.message);
+    }
+  };
+
+  const createSubscription = async (priceId: string,userId: number) => {
     const res = await fetch("/api/create-subscription",{
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ planId,userId }),
+      body: JSON.stringify({ priceId,userId }),
     });
 
-    const data = await res.json();
-
-    if (data.status === "success" && planId === "2") {
-      redirectToCheckout(data.priceId);
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.error);
     }
   };
 
-
-  const redirectToCheckout = async (priceId: string) => {
-    const stripePromise = loadStripe("your_stripe_public_key");
-
+  const collectPayment = async (priceId: string) => {
+    const stripe_key = process.env.NEXT_PUBLIC_STRIPE_KEY as string;
+    const stripePromise = loadStripe(stripe_key);
     const stripe = await stripePromise;
     if (stripe) {
       const { error } = await stripe.redirectToCheckout({
         lineItems: [{ price: priceId,quantity: 1 }],
-        mode: "subscription",
-        successUrl: "https://example.com/success",
-        cancelUrl: "https://example.com/cancel",
+        mode: "payment",
+        // redirect back to the site after payment
+        successUrl: `${window.location.origin}/`,
+        cancelUrl: `${window.location.origin}/`,
       });
-
       if (error) {
         console.error("Error:",error);
+        throw new Error(error.message);
       }
-    }
-  };
+    };
+  }
 
   interface RenderButtonsProps {
     showLogoutButton: boolean;
@@ -541,13 +587,13 @@ function Home() {
                     <div className="flex space-x-4">
                       <button
                         className="mt-2 flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-700 px-3 py-1 text-sm text-white hover:bg-blue-600"
-                        onClick={handleFreeSignup}
+                        onClick={handleFreeSignUp}
                       >
                         5 Free Questions
                       </button>
                       <button
                         className="mt-2 flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-700 px-3 py-1 text-sm text-white hover:bg-blue-600"
-                        onClick={() => redirectToCheckout("price_id_50_queries")}
+                        onClick={handlePaidSignUp}
                       >
                         $5 for 50 Questions
                       </button>
@@ -593,7 +639,7 @@ function Home() {
               </div>
             )}
 
-            {userAuthorized ? (
+            {getUserAuthorization() ? (
               <div className="relative w-full mt-4">
                 <IconSearch className="absolute top-3 w-10 left-1 h-6 rounded-full opacity-50 sm:left-3 sm:top-4 sm:h-8" />
                 <input
