@@ -34,14 +34,21 @@ export default NextAuth({
                     });
 
                     // if the user has a subscription, 
-                    const queriesAllowed = subscription.queriesAllowed ? subscription.queriesAllowed : 0;
-                    const queriesMade = subscription.queriesMade ? subscription.queriesMade : 0;
+                    if (subscription) {
+                        // set the queriesAllowed and queriesMade properties on the user object
+                        user.queriesAllowed = subscription.queriesAllowed;
+                        user.queriesMade = subscription.queriesMade;
+                    } else {
+                        // otherwise, set the queriesAllowed and queriesMade properties to 0
+                        user.queriesAllowed = 0;
+                        user.queriesMade = 0;
+                    }
 
                     return {
                         id: user.id,
                         email: user.email,
-                        queriesAllowed: queriesAllowed,
-                        queriesMade: queriesMade,
+                        queriesAllowed: user.queriesAllowed,
+                        queriesMade: user.queriesMade,
                     };
                 } else {
                     return null;

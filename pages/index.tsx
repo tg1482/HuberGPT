@@ -11,6 +11,8 @@ import { signIn,signOut,getSession,useSession,SessionProvider,getCsrfToken } fro
 import { Session } from "next-auth";
 import { useRouter } from "next/router";
 import { loadStripe } from "@stripe/stripe-js";
+import { createSubscription } from '@/lib/subscription';
+
 
 // Default session
 
@@ -229,12 +231,10 @@ function Home() {
 
   const handleClear = () => {
     localStorage.removeItem("PG_KEY");
-    localStorage.removeItem("QUERY_COUNT");
-    // localStorage.removeItem("PG_MATCH_COUNT");
-    // localStorage.removeItem("PG_MODE");
+    // localStorage.removeItem("QUERY_COUNT");
 
     setApiKey("");
-    setQueryCount(0);
+    // setQueryCount(0);
     setUserAuthorized(getUserAuthorization());
     setUseEmailPassword(false);
     setUseAPIKey(false);
@@ -252,7 +252,7 @@ function Home() {
     });
 
     if (result?.error) {
-      setError("Invalid email or password.");
+      setError(result.error);
     } else {
       const session = await getSession();
       if (session) {
@@ -310,7 +310,7 @@ function Home() {
     try {
       const userId = await signUp(email,password);
 
-      await createSubscription('1',userId);
+      await createSubscription(1,userId);
 
       console.log('Subscription created successfully!');
 
@@ -327,32 +327,15 @@ function Home() {
     try {
       const userId = await signUp(email,password);
       const priceId = "price_1MujjWCXd0dypVQUNFQ87bkn"; // replace with the actual price ID
-      await collectPayment(priceId);
-      await createSubscription(priceId,userId);
-      console.log("Subscription created successfully!");
       await handleSignIn();
+      await collectPayment(priceId,userId);
     } catch (err: any) {
       console.error('Error:',err.message);
       alert(err.message);
     }
   };
 
-  const createSubscription = async (priceId: string,userId: number) => {
-    const res = await fetch("/api/create-subscription",{
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ priceId,userId }),
-    });
-
-    if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.error);
-    }
-  };
-
-  const collectPayment = async (priceId: string) => {
+  const collectPayment = async (priceId: string,userId: number) => {
     const stripe_key = process.env.NEXT_PUBLIC_STRIPE_KEY as string;
     const stripePromise = loadStripe(stripe_key);
     const stripe = await stripePromise;
@@ -361,15 +344,16 @@ function Home() {
         lineItems: [{ price: priceId,quantity: 1 }],
         mode: "payment",
         // redirect back to the site after payment
-        successUrl: `${window.location.origin}/`,
+        successUrl: `${window.location.origin}/api/payment-success?userId=${userId}`,
         cancelUrl: `${window.location.origin}/`,
       });
       if (error) {
         console.error("Error:",error);
         throw new Error(error.message);
       }
-    };
-  }
+    }
+  };
+
 
   interface RenderButtonsProps {
     showLogoutButton: boolean;
