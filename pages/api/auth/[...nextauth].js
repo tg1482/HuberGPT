@@ -18,6 +18,8 @@ export default NextAuth({
                     where: { email: credentials.email },
                 });
 
+                console.log("user", user);
+
                 if (user && (await bcrypt.compare(credentials.password, user.password))) {
                     // query the subscriptionFacts table to see if the user has a subscription
                     const subscription = await prisma.subscriptionFact.findFirst({
@@ -42,9 +44,7 @@ export default NextAuth({
                         queriesMade: queriesMade,
                     };
                 } else {
-                    return {
-                        error: "Invalid email or password",
-                    };
+                    return null;
                 }
             },
         }),

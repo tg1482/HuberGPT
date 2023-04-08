@@ -40,23 +40,33 @@ var client_1 = require("@prisma/client");
 var prisma = new client_1.PrismaClient();
 function main() {
     return __awaiter(this, void 0, void 0, function () {
-        var user1, user2, user3, freeSubscription, premiumSubscription;
+        var defaultUser, user1, user2, user3, freeSubscription, premiumSubscription;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0: return [4 /*yield*/, prisma.userDimension.create({
                         data: {
-                            email: 'user1@example.com',
-                            password: 'password123',
-                            queries: {
-                                create: [
-                                    {
-                                        content: 'Sample query 1'
-                                    },
-                                ]
-                            }
+                            id: -99,
+                            email: 'default@example.com',
+                            password: 'default_password',
+                            createdAt: new Date()
                         }
                     })];
                 case 1:
+                    defaultUser = _a.sent();
+                    return [4 /*yield*/, prisma.userDimension.create({
+                            data: {
+                                email: 'user1@example.com',
+                                password: 'password123',
+                                queries: {
+                                    create: [
+                                        {
+                                            content: 'Sample query 1'
+                                        },
+                                    ]
+                                }
+                            }
+                        })];
+                case 2:
                     user1 = _a.sent();
                     return [4 /*yield*/, prisma.userDimension.create({
                             data: {
@@ -71,7 +81,7 @@ function main() {
                                 }
                             }
                         })];
-                case 2:
+                case 3:
                     user2 = _a.sent();
                     return [4 /*yield*/, prisma.userDimension.create({
                             data: {
@@ -79,7 +89,7 @@ function main() {
                                 password: 'password'
                             }
                         })];
-                case 3:
+                case 4:
                     user3 = _a.sent();
                     return [4 /*yield*/, prisma.subscriptionFact.create({
                             data: {
@@ -96,7 +106,7 @@ function main() {
                                 }
                             }
                         })];
-                case 4:
+                case 5:
                     freeSubscription = _a.sent();
                     return [4 /*yield*/, prisma.subscriptionFact.create({
                             data: {
@@ -113,27 +123,27 @@ function main() {
                                 }
                             }
                         })];
-                case 5:
+                case 6:
                     premiumSubscription = _a.sent();
                     // Connect subscriptions to users
                     return [4 /*yield*/, prisma.userDimension.update({
                             where: { id: user1.id },
                             data: { subscriptions: { connect: { id: freeSubscription.id } } }
                         })];
-                case 6:
+                case 7:
                     // Connect subscriptions to users
                     _a.sent();
                     return [4 /*yield*/, prisma.userDimension.update({
                             where: { id: user2.id },
                             data: { subscriptions: { connect: { id: premiumSubscription.id } } }
                         })];
-                case 7:
+                case 8:
                     _a.sent();
                     return [4 /*yield*/, prisma.userDimension.update({
                             where: { id: user3.id },
                             data: { subscriptions: { connect: { id: freeSubscription.id } } }
                         })];
-                case 8:
+                case 9:
                     _a.sent();
                     return [2 /*return*/];
             }

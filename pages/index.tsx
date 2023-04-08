@@ -58,8 +58,8 @@ function Home() {
   const [useAPIKey,setUseAPIKey] = useState<boolean>(false);
 
   const [apiKey,setApiKey] = useState<string>("");
-  const [emailInput,setEmailInput] = useState("");
-  const [passwordInput,setPasswordInput] = useState("");
+  const [email,setEmail] = useState("");
+  const [password,setPassword] = useState("");
 
   const [userId,setUserId] = useState<number>(-99);
   const [userEmail,setUserEmail] = useState<string | null>(null);
@@ -79,8 +79,8 @@ function Home() {
       setUserId(user.id);
       if (user.id !== -99) {
         setUserSignedIn(true);
+        setUserEmail(user.email);
       };
-      setUserEmail(user.email);
     }
   };
 
@@ -145,17 +145,30 @@ function Home() {
         }
       }
     });
+
+    if (userId !== -99) {
+      // Update the query count in the database
+      const update_query_count = await fetch("/api/update-query-count",{
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ userId })
+      });
+      if (!update_query_count.ok) {
+        throw new Error(update_query_count.statusText);
+      }
+    };
+
   };
 
 
-  const getUserAuthorization = (apiKey: string,queryCount: number) => {
-    if (queryCount < freeQueries || session) {
+  const getUserAuthorization = () => {
+    if (queryCount < freeQueries) {
       return true;
     } else {
       if (useAPIKey && apiKey.length === 51) {
         setOpenAPILimit(false);
-        return true;
-      } else if (useEmailPassword && session) {
         return true;
       } else {
         setOpenAPILimit(true);
@@ -168,7 +181,7 @@ function Home() {
   const postCompletion = (apiKey: string,queryCount: number) => {
     setQueryCount(queryCount + 1);
     localStorage.setItem("QUERY_COUNT",queryCount.toString());
-    setUserAuthorized(getUserAuthorization(apiKey,queryCount));
+    setUserAuthorized(getUserAuthorization());
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -188,7 +201,7 @@ function Home() {
     // localStorage.setItem("PG_MODE",mode);
 
     setShowSettings(false);
-    setUserAuthorized(getUserAuthorization(apiKey,queryCount));
+    setUserAuthorized(getUserAuthorization());
     inputRef.current?.focus();
   };
 
@@ -200,7 +213,7 @@ function Home() {
 
     setApiKey("");
     setQueryCount(0);
-    setUserAuthorized(getUserAuthorization(apiKey,queryCount));
+    setUserAuthorized(getUserAuthorization());
     setUseEmailPassword(false);
     setUseAPIKey(false);
     setShowPlans(false);
@@ -212,12 +225,12 @@ function Home() {
 
     const result = await signIn("credentials",{
       redirect: false,
-      emailInput,
-      passwordInput,
+      email,
+      password,
     });
 
     if (result?.error) {
-      setError(result.error);
+      setError("Invalid email or password.");
     } else {
       const session = await getSession();
       if (session) {
@@ -225,6 +238,7 @@ function Home() {
         console.log("User is signed in:",session.user);
         setSessionState(session.user);
         setUserSignedIn(true);
+        setShowPlans(false);
         setShowSettings(false);
       } else {
         // The sign-in attempt failed; handle the error here.
@@ -241,7 +255,7 @@ function Home() {
   const handleFreeSignup = async () => {
     try {
       // check email and password are valid
-      if (emailInput === '' || passwordInput === '') {
+      if (email === '' || password === '') {
         throw new Error('Please enter a valid email and password.');
       }
 
@@ -250,7 +264,7 @@ function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ emailInput,passwordInput }),
+        body: JSON.stringify({ email,password }),
       });
 
       if (!response.ok) {
@@ -311,6 +325,76 @@ function Home() {
     }
   };
 
+  interface RenderButtonsProps {
+    showLogoutButton: boolean;
+    showSaveButton: boolean;
+    showClearButton: boolean;
+    onLogout: () => void;
+    onSave: () => void;
+    onClear: () => void;
+  }
+
+  const renderButtons = ({
+    showLogoutButton,
+    showSaveButton,
+    showClearButton,
+    onLogout,
+    onSave,
+    onClear,
+  }: RenderButtonsProps) => (
+    <div className="mt-4 flex space-x-2 justify-center">
+
+
+      {/* {showLoginButton && (
+        <button
+          className="flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
+          onClick={onLogin}
+        >
+          Login
+        </button>
+      )}
+
+      {showSignupButton && (
+        <button
+          className="flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
+          onClick={onSignup}
+        >
+          Signup
+        </button>
+      )} */}
+
+
+      {showSaveButton && (
+        <div
+          className="flex cursor-pointer items-center space-x-2 rounded-full bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
+          onClick={onSave}
+        >
+          Save
+        </div>
+      )}
+
+      {showClearButton && (
+        <div
+          className="flex cursor-pointer items-center space-x-2 rounded-full bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+          onClick={onClear}
+        >
+          Clear
+        </div>
+      )}
+
+
+      {showLogoutButton && (
+        <button
+          className="flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
+          onClick={onLogout}
+        >
+          Logout
+        </button>
+      )}
+    </div>
+  );
+
+
 
 
   useEffect(() => {
@@ -325,7 +409,7 @@ function Home() {
       setApiKey(PG_KEY);
     }
 
-    setUserAuthorized(getUserAuthorization(apiKey,queryCount));
+    setUserAuthorized(getUserAuthorization());
     inputRef.current?.focus();
   },[]);
 
@@ -403,13 +487,13 @@ function Home() {
                     <div className="mt-2">
                       Logged In as {userEmail}
                     </div>
-                    <button
+                    {/* <button
                       // className="mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
                       className="flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
                       onClick={handleSignOut}
                     >
                       Logout
-                    </button>
+                    </button> */}
                   </div>
                 ) : (
                   useEmailPassword && (
@@ -419,26 +503,26 @@ function Home() {
                         type="email"
                         placeholder="Email"
                         className="max-w-[400px] block w-full rounded-md border border-gray-300 p-2 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
-                        value={emailInput}
-                        onChange={(e) => setEmailInput(e.target.value)}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                       />
                       <div className="mt-2">Password</div>
                       <input
                         type="password"
                         placeholder="Password"
                         className="max-w-[400px] block w-full rounded-md border border-gray-300 p-2 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
-                        value={passwordInput}
-                        onChange={(e) => setPasswordInput(e.target.value)}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                       />
                       <div className="flex space-x-4">
                         <button
-                          className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                          className="mt-2 flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
                           onClick={() => setShowPlans(true)}
                         >
                           Sign Up
                         </button>
                         <button
-                          className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                          className="mt-2 flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
                           onClick={handleSignIn}
                         >
                           Log In
@@ -453,16 +537,16 @@ function Home() {
 
                 {showPlans && (
                   <div className="flex flex-col items-center">
-                    <h1 className="text-3xl font-bold mb-4"> </h1>
+                    {/* <h1 className="text-3xl font-bold mb-4"> </h1> */}
                     <div className="flex space-x-4">
                       <button
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                        className="mt-2 flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-700 px-3 py-1 text-sm text-white hover:bg-blue-600"
                         onClick={handleFreeSignup}
                       >
                         5 Free Questions
                       </button>
                       <button
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                        className="mt-2 flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-700 px-3 py-1 text-sm text-white hover:bg-blue-600"
                         onClick={() => redirectToCheckout("price_id_50_queries")}
                       >
                         $5 for 50 Questions
@@ -497,21 +581,15 @@ function Home() {
                 </div>
 
 
-                <div className="mt-4 flex space-x-2 justify-center">
-                  <div
-                    className="flex cursor-pointer items-center space-x-2 rounded-full bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
-                    onClick={handleSave}
-                  >
-                    Save
-                  </div>
-
-                  <div
-                    className="flex cursor-pointer items-center space-x-2 rounded-full bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
-                    onClick={handleClear}
-                  >
-                    Clear
-                  </div>
-                </div>
+                {
+                  renderButtons({
+                    showLogoutButton: userSignedIn,
+                    showSaveButton: true,
+                    showClearButton: true,
+                    onLogout: handleSignOut,
+                    onSave: handleSave,
+                    onClear: handleClear,
+                  })}
               </div>
             )}
 

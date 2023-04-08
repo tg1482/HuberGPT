@@ -4,6 +4,16 @@ const prisma = new PrismaClient();
 
 async function main() {
     // Seed users
+    const defaultUser = await prisma.userDimension.create({
+        data: {
+            id: -99,
+            email: 'default@example.com',
+            password: 'default_password',
+            createdAt: new Date(),
+        },
+    });
+
+
     const user1 = await prisma.userDimension.create({
         data: {
             email: 'user1@example.com',
