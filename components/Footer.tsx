@@ -7,7 +7,7 @@ export const Footer: FC = () => {
       <div className="hidden sm:flex"></div>
 
       <div className="hidden sm:flex italic text-sm">
-        Created by
+        {/* Created by
         <a
           className="hover:opacity-50 mx-1"
           href="https://twitter.com/tanmayg172"
@@ -15,8 +15,8 @@ export const Footer: FC = () => {
           rel="noreferrer"
         >
           Tanmay Gupta
-        </a>
-        based on
+        </a> */}
+        Based on
         <a
           className="hover:opacity-50 ml-1"
           href="https://twitter.com/hubermanlab"
@@ -25,7 +25,7 @@ export const Footer: FC = () => {
         >
           Prof Andrew Huberman's
         </a>
-        {`'s blog`}
+
         <a
           className="hover:opacity-50 ml-1"
           href="https://hubermanlab.com/"
@@ -56,7 +56,9 @@ export const Footer: FC = () => {
         .
       </div>
 
-      <div className="flex space-x-4">
+      <div className="hidden sm:flex"></div>
+
+      {/* <div className="flex space-x-4">
         <a
           className="flex items-center hover:opacity-50"
           href="https://twitter.com/tanmayg172"
@@ -74,7 +76,7 @@ export const Footer: FC = () => {
         >
           <IconBrandGithub size={24} />
         </a>
-      </div>
+      </div> */}
     </div>
   );
 };
