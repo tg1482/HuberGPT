@@ -326,7 +326,7 @@ function Home() {
   const handlePaidSignUp = async () => {
     try {
       const userId = await signUp(email,password);
-      const priceId = "price_1MujjWCXd0dypVQUNFQ87bkn"; // replace with the actual price ID
+      const priceId = "price_1MumJgCXd0dypVQUqqNOBOr0"; // replace with the actual price ID
       await handleSignIn();
       await collectPayment(priceId,userId);
     } catch (err: any) {
