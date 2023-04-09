@@ -1,0 +1,40 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model UserDimension {
+  id            Int                 @id @default(autoincrement())
+  email         String              @unique
+  password      String
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  queries       QueryFact[]
+  subscriptions SubscriptionFact[]
+}
+
+model QueryFact {
+  id            Int      @id @default(autoincrement())
+  content       String
+  createdAt     DateTime @default(now())
+  user          UserDimension? @relation(fields: [userId], references: [id])
+  userId        Int?      @default(-99)
+}
+
+model SubscriptionFact {
+  id                    Int      @id @default(autoincrement())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  planId                Int
+  plan                  String
+  user                  UserDimension  @relation(fields: [userId], references: [id])
+  userId                Int
+  active                Boolean
+  price                 Float
+  queriesAllowed        Int
+  queriesMade           Int
+}

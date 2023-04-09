@@ -1,36 +1,138 @@
 import { Answer } from "@/components/Answer/Answer";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
-import { HuberbotChunk } from "@/types";
+import { HuberbotChunk,DefaultSession } from "@/types";
 import { IconArrowRight,IconExternalLink,IconSearch } from "@tabler/icons-react";
 import Head from "next/head";
 import Image from "next/image";
 import { KeyboardEvent,useEffect,useRef,useState } from "react";
 import { fetchEventSource } from '@microsoft/fetch-event-source';
+import { signIn,signOut,getSession,useSession,SessionProvider,getCsrfToken } from "next-auth/react";
+import { Session } from "next-auth";
+import { useRouter } from "next/router";
+import { loadStripe } from "@stripe/stripe-js";
+import { createSubscription } from '@/lib/subscription';
 
-export default function Home() {
+
+// Default session
+
+const defaultSession = {
+  user: {
+    id: -99,
+    email: null,
+    queriesAllowed: 2,
+    queriesMade: 0,
+  },
+  expires: new Date().toISOString(),
+};
+
+type HubergptSession = Session | DefaultSession;
+
+function HomeWrapper({ session }: { session: HubergptSession }) {
+  return (
+    <SessionProvider session={session ? session : defaultSession}>
+      <Home />
+    </SessionProvider>
+  );
+}
+
+
+export default HomeWrapper;
+
+function Home() {
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const freeQueries = 1;
 
   const [query,setQuery] = useState<string>("");
   const [chunks,setChunks] = useState<HuberbotChunk[]>([]);
   const [answer,setAnswer] = useState<string>("");
   const [loading,setLoading] = useState<boolean>(false);
+  const [error,setError] = useState<string | null>(null);
 
-  const [showSettings,setShowSettings] = useState<boolean>(false);
   const [mode,setMode] = useState<"search" | "chat">("chat");
   const [queryCount,setQueryCount] = useState<number>(0);
+  const [freeQueries,setFreeQueries] = useState<number>(1);
+  const [openAPILimit,setOpenAPILimit] = useState<boolean>(true);
+
+  const [showSettings,setShowSettings] = useState<boolean>(false);
+  const [showPlans,setShowPlans] = useState(false);
+  const [useEmailPassword,setUseEmailPassword] = useState<boolean>(false);
+  const [useAPIKey,setUseAPIKey] = useState<boolean>(false);
+
   const [apiKey,setApiKey] = useState<string>("");
+  const [email,setEmail] = useState("");
+  const [password,setPassword] = useState("");
+
+  const [userId,setUserId] = useState<number>(-99);
+  const [userEmail,setUserEmail] = useState<string | null>(null);
+  const [userSignedIn,setUserSignedIn] = useState<boolean>(false);
   const [userAuthorized,setUserAuthorized] = useState<boolean>(false);
+  const router = useRouter();
+
+  const { data: session } = useSession();
+
+  console.log(session);
+
+  const setSessionState = async (user: any) => {
+    console.log("Setting stage",user)
+    if (user) {
+      if (user.id !== -99) {
+        const response = await fetch(`/api/get-query-counts?userId=${user.id}`);
+        if (response.ok) {
+          const { queriesMade,queriesAllowed } = await response.json();
+          setFreeQueries(queriesAllowed);
+          setQueryCount(queriesMade);
+        }
+      } else {
+        setFreeQueries(user.queriesAllowed);
+        setQueryCount(user.queriesMade);
+      }
+      setUserId(user.id);
+      if (user.id !== -99) {
+        setUserSignedIn(true);
+        setUserEmail(user.email);
+      };
+    }
+  };
+
+
+  useEffect(() => {
+    if (session && session.user) {
+      setSessionState(session.user);
+    }
+  },[session]);
+
+
+  // Save session with the latest values when the user leaves the tab
+  useEffect(() => {
+    const saveSession = () => {
+      if (userId == -99 && session) {
+        sessionStorage.setItem(
+          "session",
+          JSON.stringify({ ...session,user: { ...session.user,queriesAllowed: freeQueries,queriesMade: queryCount } })
+        );
+      }
+    };
+
+    window.addEventListener("beforeunload",saveSession);
+
+    return () => {
+      window.removeEventListener("beforeunload",saveSession);
+    };
+  },[freeQueries,queryCount,session,userId]);
 
   // Handle answer 
   const handleAnswer = async () => {
 
-    if (!query) {
-      alert("Please enter a query.");
-      return;
-    }
+    // save query to db using save-query endpoint
+    const save_query = await fetch("/api/save-query",{
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ query,userId })
+    });
+
 
     setAnswer("");
     setChunks([]);
@@ -74,26 +176,37 @@ export default function Home() {
         }
       }
     });
+
+    if (userId !== -99) {
+      // Update the query count in the database
+      const update_query_count = await fetch("/api/update-query-count",{
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ userId })
+      });
+      if (!update_query_count.ok) {
+        throw new Error(update_query_count.statusText);
+      }
+    };
+
   };
 
 
-  const getUserAuthorization = (apiKey: string,queryCount: number) => {
-
-    if (queryCount < freeQueries) {
-      return true;
+  const getUserAuthorization = () => {
+    if (userId === -99) {
+      return queryCount < freeQueries;
     } else {
-      if (apiKey.length === 51) {
-        return true;
-      } else {
-        return false
-      }
+      return queryCount < freeQueries || (!apiKey && queryCount < freeQueries + 1);
     }
-  }
+  };
+
+
 
   const postCompletion = (apiKey: string,queryCount: number) => {
-    setQueryCount((prev) => prev + 1);
+    setQueryCount(queryCount + 1);
     localStorage.setItem("QUERY_COUNT",queryCount.toString());
-    setUserAuthorized(getUserAuthorization(apiKey,queryCount));
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -113,20 +226,206 @@ export default function Home() {
     // localStorage.setItem("PG_MODE",mode);
 
     setShowSettings(false);
-    setUserAuthorized(getUserAuthorization(apiKey,queryCount));
     inputRef.current?.focus();
   };
 
   const handleClear = () => {
     localStorage.removeItem("PG_KEY");
-    localStorage.removeItem("QUERY_COUNT");
-    // localStorage.removeItem("PG_MATCH_COUNT");
-    // localStorage.removeItem("PG_MODE");
+    // localStorage.removeItem("QUERY_COUNT");
 
     setApiKey("");
-    setQueryCount(0);
-    setUserAuthorized(getUserAuthorization(apiKey,queryCount));
+    // setQueryCount(0);
+    setUserAuthorized(getUserAuthorization());
+    setUseEmailPassword(false);
+    setUseAPIKey(false);
+    setShowPlans(false);
   };
+
+
+  const handleSignIn = async () => {
+    setError(null);
+
+    const result = await signIn("credentials",{
+      redirect: false,
+      email,
+      password,
+    });
+
+    if (result?.error) {
+      setError(result.error);
+    } else {
+      const session = await getSession();
+      if (session) {
+        // The user is now signed in; handle the signed-in state here.
+        console.log("User is signed in:",session.user);
+        setSessionState(session.user);
+        setUserSignedIn(true);
+        setShowPlans(false);
+        setShowSettings(false);
+      } else {
+        // The sign-in attempt failed; handle the error here.
+        setError("Something going on");
+      }
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
+
+  const signUp = async (email: string,password: string) => {
+    try {
+      // check email and password are valid
+      if (email === '' || password === '') {
+        throw new Error('Please enter a valid email and password.');
+      }
+
+      const response = await fetch('/api/signup',{
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email,password }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error);
+      }
+
+      console.log('User created successfully!');
+
+      const responseBody = await response.json();
+      const userId = parseInt(responseBody.userId);
+
+      return userId;
+    } catch (err: any) {
+      console.error('Error:',err.message);
+      throw new Error(err.message);
+    }
+  };
+
+  const handleFreeSignUp = async () => {
+    try {
+      const userId = await signUp(email,password);
+
+      await createSubscription(1,userId);
+
+      console.log('Subscription created successfully!');
+
+      // sign in
+      await handleSignIn();
+    } catch (err: any) {
+      console.error('Error:',err.message);
+      alert(err.message);
+    }
+  };
+
+
+  const handlePaidSignUp = async () => {
+    try {
+      const userId = await signUp(email,password);
+      const priceId = "price_1MumJgCXd0dypVQUqqNOBOr0"; // replace with the actual price ID
+      await handleSignIn();
+      await collectPayment(priceId,userId);
+    } catch (err: any) {
+      console.error('Error:',err.message);
+      alert(err.message);
+    }
+  };
+
+  const collectPayment = async (priceId: string,userId: number) => {
+    const stripe_key = process.env.NEXT_PUBLIC_STRIPE_KEY as string;
+    const stripePromise = loadStripe(stripe_key);
+    const stripe = await stripePromise;
+    if (stripe) {
+      const { error } = await stripe.redirectToCheckout({
+        lineItems: [{ price: priceId,quantity: 1 }],
+        mode: "payment",
+        // redirect back to the site after payment
+        successUrl: `${window.location.origin}/api/payment-success?userId=${userId}`,
+        cancelUrl: `${window.location.origin}/`,
+      });
+      if (error) {
+        console.error("Error:",error);
+        throw new Error(error.message);
+      }
+    }
+  };
+
+
+  interface RenderButtonsProps {
+    showLogoutButton: boolean;
+    showSaveButton: boolean;
+    showClearButton: boolean;
+    onLogout: () => void;
+    onSave: () => void;
+    onClear: () => void;
+  }
+
+  const renderButtons = ({
+    showLogoutButton,
+    showSaveButton,
+    showClearButton,
+    onLogout,
+    onSave,
+    onClear,
+  }: RenderButtonsProps) => (
+    <div className="mt-4 flex space-x-2 justify-center">
+
+
+      {/* {showLoginButton && (
+        <button
+          className="flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
+          onClick={onLogin}
+        >
+          Login
+        </button>
+      )}
+
+      {showSignupButton && (
+        <button
+          className="flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
+          onClick={onSignup}
+        >
+          Signup
+        </button>
+      )} */}
+
+
+      {showSaveButton && (
+        <div
+          className="flex cursor-pointer items-center space-x-2 rounded-full bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
+          onClick={onSave}
+        >
+          Save
+        </div>
+      )}
+
+      {showClearButton && (
+        <div
+          className="flex cursor-pointer items-center space-x-2 rounded-full bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+          onClick={onClear}
+        >
+          Clear
+        </div>
+      )}
+
+
+      {showLogoutButton && (
+        <button
+          className="flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
+          onClick={onLogout}
+        >
+          Logout
+        </button>
+      )}
+    </div>
+  );
+
+
+
 
   useEffect(() => {
     const PG_KEY = localStorage.getItem("PG_KEY");
@@ -140,7 +439,7 @@ export default function Home() {
       setApiKey(PG_KEY);
     }
 
-    setUserAuthorized(getUserAuthorization(apiKey,queryCount));
+    setUserAuthorized(getUserAuthorization());
     inputRef.current?.focus();
   },[]);
 
@@ -176,46 +475,155 @@ export default function Home() {
             {showSettings && (
               <div className="w-[340px] sm:w-[400px]">
                 <div className="mt-2">
-                  <div>OpenAI API Key</div>
-                  <input
-                    type="password"
-                    placeholder="OpenAI API Key"
-                    className="max-w-[400px] block w-full rounded-md border border-gray-300 p-2 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
-                    value={apiKey}
-                    onChange={(e) => {
-                      setApiKey(e.target.value);
-
-                      if (e.target.value.length !== 51) {
-                        setShowSettings(true);
-                      }
-                    }}
-                  />
+                  <div className="flex justify-between">
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="emailPassword"
+                        name="authOption"
+                        value="emailPassword"
+                        checked={useEmailPassword}
+                        onChange={() => {
+                          setUseEmailPassword(true);
+                          setUseAPIKey(false);
+                        }}
+                      />
+                      <label htmlFor="emailPassword" className="ml-2">
+                        Email and Password
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="apiKey"
+                        name="authOption"
+                        value="apiKey"
+                        checked={useAPIKey}
+                        onChange={() => {
+                          setUseAPIKey(true);
+                          setUseEmailPassword(false);
+                          setShowPlans(false);
+                        }}
+                      />
+                      <label htmlFor="apiKey" className="ml-2">
+                        OpenAI API Key
+                      </label>
+                    </div>
+                  </div>
                 </div>
+
+                {userSignedIn ? (
+                  <div className="mt-2">
+                    <div className="mt-2">
+                      Logged In as {userEmail}
+                    </div>
+                    {/* <button
+                      // className="mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+                      className="flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
+                      onClick={handleSignOut}
+                    >
+                      Logout
+                    </button> */}
+                  </div>
+                ) : (
+                  useEmailPassword && (
+                    <div className="mt-2">
+                      <div>Email</div>
+                      <input
+                        type="email"
+                        placeholder="Email"
+                        className="max-w-[400px] block w-full rounded-md border border-gray-300 p-2 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                      />
+                      <div className="mt-2">Password</div>
+                      <input
+                        type="password"
+                        placeholder="Password"
+                        className="max-w-[400px] block w-full rounded-md border border-gray-300 p-2 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                      <div className="flex space-x-4">
+                        <button
+                          className="mt-2 flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
+                          onClick={() => setShowPlans(true)}
+                        >
+                          Sign Up
+                        </button>
+                        <button
+                          className="mt-2 flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
+                          onClick={handleSignIn}
+                        >
+                          Log In
+                        </button>
+                      </div>
+                      {error && (
+                        <div className="mt-2 text-red-600">{error}</div>
+                      )}
+                    </div>
+                  )
+                )}
+
+                {showPlans && (
+                  <div className="flex flex-col items-center">
+                    {/* <h1 className="text-3xl font-bold mb-4"> </h1> */}
+                    <div className="flex space-x-4">
+                      <button
+                        className="mt-2 flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-700 px-3 py-1 text-sm text-white hover:bg-blue-600"
+                        onClick={handleFreeSignUp}
+                      >
+                        5 Free Questions
+                      </button>
+                      <button
+                        className="mt-2 flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-700 px-3 py-1 text-sm text-white hover:bg-blue-600"
+                        onClick={handlePaidSignUp}
+                      >
+                        $5 for 50 Questions
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {useAPIKey && (
+                  <div className="mt-2">
+                    <div>OpenAI API Key</div>
+                    <input
+                      type="password"
+                      placeholder="OpenAI API Key"
+                      className="max-w-[400px] block w-full rounded-md border border-gray-300 p-2 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
+                      value={apiKey}
+                      onChange={(e) => {
+                        setApiKey(e.target.value);
+
+                        if (e.target.value.length !== 51) {
+                          setShowSettings(true);
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+
 
                 {/* add some space above and a thin outline */}
                 <div className="mt-4">
-                  Queries executed: {queryCount}
+                  Queries executed: {queryCount} / {openAPILimit ? freeQueries : '∞'}
                 </div>
 
-                <div className="mt-4 flex space-x-2 justify-center">
-                  <div
-                    className="flex cursor-pointer items-center space-x-2 rounded-full bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
-                    onClick={handleSave}
-                  >
-                    Save
-                  </div>
 
-                  <div
-                    className="flex cursor-pointer items-center space-x-2 rounded-full bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
-                    onClick={handleClear}
-                  >
-                    Clear
-                  </div>
-                </div>
+                {
+                  renderButtons({
+                    showLogoutButton: userSignedIn,
+                    showSaveButton: true,
+                    showClearButton: true,
+                    onLogout: handleSignOut,
+                    onSave: handleSave,
+                    onClear: handleClear,
+                  })}
               </div>
             )}
 
-            {userAuthorized ? (
+            {getUserAuthorization() ? (
               <div className="relative w-full mt-4">
                 <IconSearch className="absolute top-3 w-10 left-1 h-6 rounded-full opacity-50 sm:left-3 sm:top-4 sm:h-8" />
                 <input
@@ -331,7 +739,7 @@ export default function Home() {
           </div>
         </div>
         <Footer />
-      </div>
+      </div >
     </>
   );
 }
