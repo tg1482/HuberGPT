@@ -195,13 +195,13 @@ function Home() {
 
 
   const getUserAuthorization = () => {
-    if (userId === -99) {
-      return queryCount < freeQueries;
-    } else {
-      return queryCount < freeQueries || (!apiKey && queryCount < freeQueries + 1);
+    if (queryCount < freeQueries) {
+      return true;
+    } else if (apiKey) {
+      return true;
     }
+    return false;
   };
-
 
 
   const postCompletion = (apiKey: string,queryCount: number) => {
@@ -595,9 +595,9 @@ function Home() {
                       value={apiKey}
                       onChange={(e) => {
                         setApiKey(e.target.value);
-
                         if (e.target.value.length !== 51) {
                           setShowSettings(true);
+                          setOpenAPILimit(false);
                         }
                       }}
                     />
