@@ -30,7 +30,8 @@ fi
 npx prisma migrate reset --force
 
 # Apply migrations and create the database if it doesn't exist
-npx prisma migrate dev --name init --create-only
+# npx prisma migrate dev --name init --create-only
+npx prisma db push
 
 # Seed the database if a seed.ts or seed.js file exists
 if [ -f "./prisma/seed.ts" ]; then
