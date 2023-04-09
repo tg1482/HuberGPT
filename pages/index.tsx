@@ -638,14 +638,10 @@ function Home() {
               </div>
             ) : (
               <div className="text-center font-bold text-3xl mt-7">
-                Please Login, Signup, or enter your
-                <a
-                  className="mx-2 underline hover:opacity-50"
-                  href="https://platform.openai.com/account/api-keys"
-                >
-                  OpenAI API key
-                </a>
-                in settings.
+                Kindly authenticate using Login or OpenAI API Key in{' '}
+                <a className="underline hover:opacity-50" onClick={() => setShowSettings(true)}>
+                  Settings
+                </a>{' '}
               </div>
             )}
 
