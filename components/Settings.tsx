@@ -382,7 +382,7 @@ export const Settings: React.FC<SettingsProps> = ({
                                         {renderInputField("password","API Key",(e) => setApiKey(e.target.value))}
                                         <SubGroupButton
                                             title="Submit"
-                                            onClick={() => handleApiKeySubmit(apiKey)}
+                                            onClick={handleApiKeySubmit}
                                         />
                                     </div>
                                 ))}
