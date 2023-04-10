@@ -1,20 +1,49 @@
-# Lex GPT
+# HuberGPT
 
-This app enables AI-powered search for Lex Fridman podcast.
+This app enables AI-powered search for Andrew Huberman. 
 
-This is also a testbed for exploring Langchain functionality. 
+This is also a testbed for exploring Langchain functionality and building a production-ready app.
+
+This app currently has the following features:
+* GPT-3.5 based QA search over Huberman's content
+* Giving source transcripts for the answers
+* Login authentication with NextAuth
+* Database support with Pinecone for embedding and MySql for queries / user login
+
+Future features that I would like to include:
+* User profiles for better prompts and customized results
+* Allow multiple modes of search (highlevel, detailed, proscons, etc.)
+* Show most popular questions and answers per week
+* Allow users to add questions to Huberman 
+* Cleaner settings:
+    - Authentication
+    - Profile
+    - Search parameters
+    - Action Buttons
+* Cron job to give updates on app activity
+* Cache for Db queries
+
+
+## Services Used
+
+* GPT 3.5 API - [OpenAI API](https://platform.openai.com/account/usage)
+* Vector Database - [Pinecone](https://app.pinecone.io/organizations/-NSF28yCohvGNkY0XNGu/projects/us-east4-gcp:7c9ad57/indexes/huberbot)
+* Payment Gateway - [Stripe](https://dashboard.stripe.com/payments)
+* MySQL Database - [PlanetScale](https://app.planetscale.com/tg1482/hubergpt)
+* Web Server - [Vercel](https://vercel.com/tg1482/huber-gpt)
+* Helpful Partner - [ChatGPT](https://chat.openai.com/chat)
+
 
 ## Dataset
  
-Scrape ep 1-325 Whisper transcriptions via @karpathy for first 325 episodes:
- 
-https://karpathy.ai/lexicap/index.html
+Get all videos from 
 
-Trascribe remaining episodes (through episode 365) with Whisper.
+Trascribe all episodes with Whisper.
  
 Transcribed data is split / embedded (Pinecone) with Langchain.
 
-All steps outlined in: `scripts/get_data.ipynb`
+All steps outlined in: `scripts/get_data_huberman.ipynb`
+TODO: add script to automate this process.
 
 ## Search
 
@@ -31,22 +60,11 @@ This builds on the excellent UI from https://github.com/mckaywrigley/wait-but-wh
 
 ## Deploy
 
-Note: the app that supports streaming is deployed to fly.io: https://lex-gpt.fly.dev/
-
-This is because Vercel requires edge functions for streaming.
-
-We are working on getting edge functions working with Langchain.
-
-In the meantime, use https://lex-gpt.fly.dev/ for the more performant app. 
+Note: the app that supports streaming is deployed to vercel.app: https://huber-gpt.vercel.app/
 
 ## Credits
 
 Thanks to [Mckay Wrigley](https://twitter.com/mckaywrigley) for open-sourcing his UI.
  
-Thanks to Lex Fridman for the excellent podcast.
+Thanks to Andrew Huberman for the excellent podcast.
 
-Thanks to Karapthy for the Whisper transcriptions.
-
-## Contact
-
-If you have any questions, feel free to reach out to me on [Twitter](https://twitter.com/RLanceMartin)!
