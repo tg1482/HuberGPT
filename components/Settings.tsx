@@ -169,7 +169,7 @@ export const Settings: React.FC<SettingsProps> = ({
     const renderInputField = (type: string,placeholder: string,onChange: (e: React.ChangeEvent<HTMLInputElement>) => void) => (
         <input
             type={type}
-            placeholder={userAnythingElse ? userAnythingElse : placeholder}
+            placeholder={placeholder}
             className="mt-2 flex cursor-pointer items-center space-x-2 rounded-full border border-zinc-600 px-3 py-1 text-sm hover:opacity-50 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
             onChange={onChange}
         />
@@ -186,7 +186,8 @@ export const Settings: React.FC<SettingsProps> = ({
         });
 
         if (result?.error) {
-            setError(result.error);
+            console.log(result.error);
+            alert("Incorrect email or password");
         } else {
             const session = await getSession();
             if (session) {
@@ -197,7 +198,8 @@ export const Settings: React.FC<SettingsProps> = ({
                 setShowSettings(false);
             } else {
                 // The sign-in attempt failed; handle the error here.
-                setError("Something going on");
+                // setError("Something going on");
+                alert("Something went wrong");
             }
         }
     };
@@ -219,7 +221,7 @@ export const Settings: React.FC<SettingsProps> = ({
 
         try {
             // check email and password are valid
-            if ((email === '' || password === '') && !isValidEmail(email)) {
+            if ((!email || !password) || (email === '' || password === '') || !isValidEmail(email)) {
                 throw new Error('Please enter a valid email and password.');
             }
 
@@ -339,20 +341,31 @@ export const Settings: React.FC<SettingsProps> = ({
                         content: (
                             <div>
                                 <SubGroupButton
-                                    title="Sign In"
+                                    title={userSignedIn ? `Signed in as ${userEmail}` : "Sign In"}
                                     style="bg-green-600"
                                     onClick={() => handleSubGroupButtonClick("credentials")}
                                 />
-                                {renderSubGroupContent("credentials",(
-                                    <div>
-                                        {renderInputField("email","Email",(e) => setEmail(e.target.value))}
-                                        {renderInputField("password","Password",(e) => setPassword(e.target.value))}
-                                        <SubGroupButton
-                                            title="Sign In"
-                                            onClick={handleSignIn}
-                                        />
-                                    </div>
-                                ))}
+                                {userSignedIn ? (
+                                    renderSubGroupContent("credentials",(
+                                        <div>
+                                            <SubGroupButton
+                                                title="Sign Out"
+                                                onClick={handleSignOut}
+                                            />
+                                        </div>
+                                    ))
+                                ) : (
+                                    renderSubGroupContent("credentials",(
+                                        <div>
+                                            {renderInputField("email","Email",(e) => setEmail(e.target.value))}
+                                            {renderInputField("password","Password",(e) => setPassword(e.target.value))}
+                                            <SubGroupButton
+                                                title="Sign In"
+                                                onClick={handleSignIn}
+                                            />
+                                        </div>
+                                    ))
+                                )}
                                 <SubGroupButton
                                     title="Sign Up"
                                     style="bg-green-600"

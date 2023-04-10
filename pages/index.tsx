@@ -279,7 +279,7 @@ function Home() {
   }
 
   const QueryInfoBox: React.FC<QueryInfoBoxProps> = ({ apiKey,queriesMade,queriesAllowed }) => {
-    const limitReachedColor = queriesMade >= queriesAllowed && !apiKey ? "bg-red-500 text-white" : "";
+    const limitReachedColor = queriesMade >= queriesAllowed && !apiKey ? "bg-red-500 text-white" : "bg-green-500 text-white";
     return (
       <div className={`mt-2 flex items-center space-x-2 rounded-full border border-zinc-600 px-3 py-1 text-sm ${limitReachedColor}`}>
         {apiKey && apiKey.length == 51 ? (
