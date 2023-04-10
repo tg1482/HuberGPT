@@ -1,6 +1,7 @@
 import { Answer } from "@/components/Answer/Answer";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
+import { Settings } from "@/components/Settings";
 import { HuberbotChunk,DefaultSession } from "@/types";
 import { IconArrowRight,IconExternalLink,IconSearch } from "@tabler/icons-react";
 import Head from "next/head";
@@ -10,8 +11,6 @@ import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { signIn,signOut,getSession,useSession,SessionProvider,getCsrfToken } from "next-auth/react";
 import { Session } from "next-auth";
 import { useRouter } from "next/router";
-import { loadStripe } from "@stripe/stripe-js";
-import { createSubscription } from '@/lib/subscription';
 
 
 // Default session
@@ -67,6 +66,14 @@ function Home() {
   const [userEmail,setUserEmail] = useState<string | null>(null);
   const [userSignedIn,setUserSignedIn] = useState<boolean>(false);
   const [userAuthorized,setUserAuthorized] = useState<boolean>(false);
+
+  // profile
+  const [userAgeGroup,setUserAgeGroup] = useState("");
+  const [userSex,setUserSex] = useState("");
+  const [userFitnessLevel,setUserFitnessLevel] = useState("");
+  const [userAnythingElse,setUserAnythingElse] = useState("");
+  const [userSearchParameters,setUserSearchParameters] = useState<string>("Highlevel");
+
   const router = useRouter();
 
   const { data: session } = useSession();
@@ -95,7 +102,6 @@ function Home() {
     }
   };
 
-
   useEffect(() => {
     if (session && session.user) {
       setSessionState(session.user);
@@ -103,9 +109,40 @@ function Home() {
   },[session]);
 
 
+  useEffect(() => {
+    const PG_KEY = localStorage.getItem("HGPT_OPENAI_KEY");
+    const QUERY_COUNT = localStorage.getItem("HGPT_QUERY_COUNT");
+    const USER_AGE = localStorage.getItem("HGPT_USER_AGE");
+    const USER_SEX = localStorage.getItem("HGPT_USER_SEX");
+    const USER_FITNESS_LEVEL = localStorage.getItem("HGPT_USER_FITNESS_LEVEL");
+    const USER_ADDITIONAL_INFO = localStorage.getItem("HGPT_USER_ADDITIONAL_INFO");
+
+    if (QUERY_COUNT) {
+      setQueryCount(parseInt(QUERY_COUNT));
+    }
+    if (PG_KEY) {
+      setApiKey(PG_KEY);
+    }
+    if (USER_AGE) {
+      setUserAgeGroup(USER_AGE);
+    }
+    if (USER_SEX) {
+      setUserSex(USER_SEX);
+    }
+    if (USER_FITNESS_LEVEL) {
+      setUserFitnessLevel(USER_FITNESS_LEVEL);
+    }
+    if (USER_ADDITIONAL_INFO) {
+      setUserAnythingElse(USER_ADDITIONAL_INFO);
+    }
+    setUserAuthorized(getUserAuthorization());
+    inputRef.current?.focus();
+  },[]);
+
   // Save session with the latest values when the user leaves the tab
   useEffect(() => {
     const saveSession = () => {
+      console.log("Saving session");
       if (userId == -99 && session) {
         sessionStorage.setItem(
           "session",
@@ -113,16 +150,35 @@ function Home() {
         );
       }
     };
-
-    window.addEventListener("beforeunload",saveSession);
-
-    return () => {
-      window.removeEventListener("beforeunload",saveSession);
-    };
+    saveSession();
+    console.log(userAgeGroup,userSex,userFitnessLevel,userAnythingElse);
   },[freeQueries,queryCount,session,userId]);
 
   // Handle answer 
   const handleAnswer = async () => {
+
+    // User profile
+    let userProfile = ""
+    if (userAgeGroup) {
+      userProfile = userProfile + `I'm a ${userAgeGroup} year old. `;
+    }
+    if (userSex) {
+      userProfile = userProfile + `I am a ${userSex}. `;
+    }
+    if (userFitnessLevel) {
+      userProfile = userProfile + `I am ${userFitnessLevel} in fitness. `;
+    }
+    if (userAnythingElse) {
+      userProfile = userProfile + ` ${userAnythingElse}`;
+    }
+
+    // Search Parameters
+    let searchSettings = "I am looking for a high level overview of the topic. Keep your answer about 5 sentences long.";
+    if (userSearchParameters === "Detail") {
+      searchSettings = `I am looking for a detailed answer to my question. Start with the background and then give me arguments that support and go against. Keep your answer about 10 sentences long.`;
+    } else if (userSearchParameters === "ProsVCons") {
+      searchSettings = `Give me a detailed Pros and Cons comparision of the topic. Keep your answer about 10 sentences long.`;
+    }
 
     // save query to db using save-query endpoint
     const save_query = await fetch("/api/save-query",{
@@ -132,7 +188,6 @@ function Home() {
       },
       body: JSON.stringify({ query,userId })
     });
-
 
     setAnswer("");
     setChunks([]);
@@ -155,8 +210,10 @@ function Home() {
     setChunks(results);
 
     // Prompt for LLM summarization
-    const prompt = `You are a helpful assistant that accurately answers queries using Andrew Huberman podcast episodes. Use the text provided to form your answer, but avoid copying word-for-word from the posts. Try to use your own words when possible. Keep your answer under 5 sentences. Be accurate, helpful, concise, and clear. Use the following passages to provide an answer to the query: "${query}"`
+    const prompt = `You are a helpful assistant that accurately answers queries using Andrew Huberman podcast episodes. Use the text provided to form your answer, but avoid copying word-for-word from the posts. Try to use your own words when possible. Use the following passages to provide an answer to the query: "${query}". Tailor the response to the user's profile: "${userProfile}". ${searchSettings}.`
     const ctrl = new AbortController();
+
+    console.log("Prompt",prompt);
 
     fetchEventSource("/api/vectordbqa",{
       method: "POST",
@@ -197,7 +254,7 @@ function Home() {
   const getUserAuthorization = () => {
     if (queryCount < freeQueries) {
       return true;
-    } else if (apiKey) {
+    } else if (apiKey && apiKey.length == 51) {
       return true;
     }
     return false;
@@ -206,7 +263,7 @@ function Home() {
 
   const postCompletion = (apiKey: string,queryCount: number) => {
     setQueryCount(queryCount + 1);
-    localStorage.setItem("QUERY_COUNT",queryCount.toString());
+    localStorage.setItem("HGPT_QUERY_COUNT",queryCount.toString());
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -215,233 +272,25 @@ function Home() {
     }
   };
 
-  const handleSave = () => {
-    if (apiKey.length !== 51) {
-      alert("Please enter a valid API key.");
-      return;
-    }
-
-    localStorage.setItem("PG_KEY",apiKey);
-    // localStorage.setItem("PG_MATCH_COUNT",matchCount.toString());
-    // localStorage.setItem("PG_MODE",mode);
-
-    setShowSettings(false);
-    inputRef.current?.focus();
-  };
-
-  const handleClear = () => {
-    localStorage.removeItem("PG_KEY");
-    // localStorage.removeItem("QUERY_COUNT");
-
-    setApiKey("");
-    // setQueryCount(0);
-    setUserAuthorized(getUserAuthorization());
-    setUseEmailPassword(false);
-    setUseAPIKey(false);
-    setShowPlans(false);
-  };
-
-
-  const handleSignIn = async () => {
-    setError(null);
-
-    const result = await signIn("credentials",{
-      redirect: false,
-      email,
-      password,
-    });
-
-    if (result?.error) {
-      setError(result.error);
-    } else {
-      const session = await getSession();
-      if (session) {
-        // The user is now signed in; handle the signed-in state here.
-        console.log("User is signed in:",session.user);
-        setSessionState(session.user);
-        setUserSignedIn(true);
-        setShowPlans(false);
-        setShowSettings(false);
-      } else {
-        // The sign-in attempt failed; handle the error here.
-        setError("Something going on");
-      }
-    }
-  };
-
-  const handleSignOut = async () => {
-    await signOut();
-  };
-
-
-  const signUp = async (email: string,password: string) => {
-    try {
-      // check email and password are valid
-      if (email === '' || password === '') {
-        throw new Error('Please enter a valid email and password.');
-      }
-
-      const response = await fetch('/api/signup',{
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email,password }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error);
-      }
-
-      console.log('User created successfully!');
-
-      const responseBody = await response.json();
-      const userId = parseInt(responseBody.userId);
-
-      return userId;
-    } catch (err: any) {
-      console.error('Error:',err.message);
-      throw new Error(err.message);
-    }
-  };
-
-  const handleFreeSignUp = async () => {
-    try {
-      const userId = await signUp(email,password);
-
-      await createSubscription(1,userId);
-
-      console.log('Subscription created successfully!');
-
-      // sign in
-      await handleSignIn();
-    } catch (err: any) {
-      console.error('Error:',err.message);
-      alert(err.message);
-    }
-  };
-
-
-  const handlePaidSignUp = async () => {
-    try {
-      const userId = await signUp(email,password);
-      const priceId = "price_1MumJgCXd0dypVQUqqNOBOr0"; // replace with the actual price ID
-      await handleSignIn();
-      await collectPayment(priceId,userId);
-    } catch (err: any) {
-      console.error('Error:',err.message);
-      alert(err.message);
-    }
-  };
-
-  const collectPayment = async (priceId: string,userId: number) => {
-    const stripe_key = process.env.NEXT_PUBLIC_STRIPE_KEY as string;
-    const stripePromise = loadStripe(stripe_key);
-    const stripe = await stripePromise;
-    if (stripe) {
-      const { error } = await stripe.redirectToCheckout({
-        lineItems: [{ price: priceId,quantity: 1 }],
-        mode: "payment",
-        // redirect back to the site after payment
-        successUrl: `${window.location.origin}/api/payment-success?userId=${userId}`,
-        cancelUrl: `${window.location.origin}/`,
-      });
-      if (error) {
-        console.error("Error:",error);
-        throw new Error(error.message);
-      }
-    }
-  };
-
-
-  interface RenderButtonsProps {
-    showLogoutButton: boolean;
-    showSaveButton: boolean;
-    showClearButton: boolean;
-    onLogout: () => void;
-    onSave: () => void;
-    onClear: () => void;
+  interface QueryInfoBoxProps {
+    apiKey: string;
+    queriesMade: number;
+    queriesAllowed: number;
   }
 
-  const renderButtons = ({
-    showLogoutButton,
-    showSaveButton,
-    showClearButton,
-    onLogout,
-    onSave,
-    onClear,
-  }: RenderButtonsProps) => (
-    <div className="mt-4 flex space-x-2 justify-center">
+  const QueryInfoBox: React.FC<QueryInfoBoxProps> = ({ apiKey,queriesMade,queriesAllowed }) => {
+    const limitReachedColor = queriesMade >= queriesAllowed && !apiKey ? "bg-red-500 text-white" : "";
+    return (
+      <div className={`mt-2 flex items-center space-x-2 rounded-full border border-zinc-600 px-3 py-1 text-sm ${limitReachedColor}`}>
+        {apiKey && apiKey.length == 51 ? (
+          'API Authenticated'
+        ) : (
+          `${queriesMade} / ${queriesAllowed} Queries`
+        )}
+      </div>
+    );
+  };
 
-
-      {/* {showLoginButton && (
-        <button
-          className="flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
-          onClick={onLogin}
-        >
-          Login
-        </button>
-      )}
-
-      {showSignupButton && (
-        <button
-          className="flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
-          onClick={onSignup}
-        >
-          Signup
-        </button>
-      )} */}
-
-
-      {showSaveButton && (
-        <div
-          className="flex cursor-pointer items-center space-x-2 rounded-full bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
-          onClick={onSave}
-        >
-          Save
-        </div>
-      )}
-
-      {showClearButton && (
-        <div
-          className="flex cursor-pointer items-center space-x-2 rounded-full bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
-          onClick={onClear}
-        >
-          Clear
-        </div>
-      )}
-
-
-      {showLogoutButton && (
-        <button
-          className="flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
-          onClick={onLogout}
-        >
-          Logout
-        </button>
-      )}
-    </div>
-  );
-
-
-
-
-  useEffect(() => {
-    const PG_KEY = localStorage.getItem("PG_KEY");
-    const QUERY_COUNT = localStorage.getItem("QUERY_COUNT");
-
-    if (QUERY_COUNT) {
-      setQueryCount(parseInt(QUERY_COUNT));
-    }
-
-    if (PG_KEY) {
-      setApiKey(PG_KEY);
-    }
-
-    setUserAuthorized(getUserAuthorization());
-    inputRef.current?.focus();
-  },[]);
 
   // Render page
   return (
@@ -466,163 +315,38 @@ function Home() {
         <Navbar />
         <div className="flex-1 overflow-auto">
           <div className="mx-auto flex h-full w-full max-w-[750px] flex-col items-center px-3 pt-4 sm:pt-8">
-            <button
-              className="mt-4 flex cursor-pointer items-center space-x-2 rounded-full border border-zinc-600 px-3 py-1 text-sm hover:opacity-50"
-              onClick={() => setShowSettings(!showSettings)}
-            >
-              {showSettings ? "Hide" : "Show"} Settings
-            </button>
-            {showSettings && (
-              <div className="w-[340px] sm:w-[400px]">
-                <div className="mt-2">
-                  <div className="flex justify-between">
-                    <div className="flex items-center">
-                      <input
-                        type="radio"
-                        id="emailPassword"
-                        name="authOption"
-                        value="emailPassword"
-                        checked={useEmailPassword}
-                        onChange={() => {
-                          setUseEmailPassword(true);
-                          setUseAPIKey(false);
-                        }}
-                      />
-                      <label htmlFor="emailPassword" className="ml-2">
-                        Email and Password
-                      </label>
-                    </div>
-                    <div className="flex items-center">
-                      <input
-                        type="radio"
-                        id="apiKey"
-                        name="authOption"
-                        value="apiKey"
-                        checked={useAPIKey}
-                        onChange={() => {
-                          setUseAPIKey(true);
-                          setUseEmailPassword(false);
-                          setShowPlans(false);
-                        }}
-                      />
-                      <label htmlFor="apiKey" className="ml-2">
-                        OpenAI API Key
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                {userSignedIn ? (
-                  <div className="mt-2">
-                    <div className="mt-2">
-                      Logged In as {userEmail}
-                    </div>
-                    {/* <button
-                      // className="mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
-                      className="flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
-                      onClick={handleSignOut}
-                    >
-                      Logout
-                    </button> */}
-                  </div>
-                ) : (
-                  useEmailPassword && (
-                    <div className="mt-2">
-                      <div>Email</div>
-                      <input
-                        type="email"
-                        placeholder="Email"
-                        className="max-w-[400px] block w-full rounded-md border border-gray-300 p-2 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                      <div className="mt-2">Password</div>
-                      <input
-                        type="password"
-                        placeholder="Password"
-                        className="max-w-[400px] block w-full rounded-md border border-gray-300 p-2 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                      />
-                      <div className="flex space-x-4">
-                        <button
-                          className="mt-2 flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
-                          onClick={() => setShowPlans(true)}
-                        >
-                          Sign Up
-                        </button>
-                        <button
-                          className="mt-2 flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
-                          onClick={handleSignIn}
-                        >
-                          Log In
-                        </button>
-                      </div>
-                      {error && (
-                        <div className="mt-2 text-red-600">{error}</div>
-                      )}
-                    </div>
-                  )
-                )}
-
-                {showPlans && (
-                  <div className="flex flex-col items-center">
-                    {/* <h1 className="text-3xl font-bold mb-4"> </h1> */}
-                    <div className="flex space-x-4">
-                      <button
-                        className="mt-2 flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-700 px-3 py-1 text-sm text-white hover:bg-blue-600"
-                        onClick={handleFreeSignUp}
-                      >
-                        5 Free Questions
-                      </button>
-                      <button
-                        className="mt-2 flex cursor-pointer items-center space-x-2 space-y-2 rounded-full bg-blue-700 px-3 py-1 text-sm text-white hover:bg-blue-600"
-                        onClick={handlePaidSignUp}
-                      >
-                        $5 for 50 Questions
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {useAPIKey && (
-                  <div className="mt-2">
-                    <div>OpenAI API Key</div>
-                    <input
-                      type="password"
-                      placeholder="OpenAI API Key"
-                      className="max-w-[400px] block w-full rounded-md border border-gray-300 p-2 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
-                      value={apiKey}
-                      onChange={(e) => {
-                        setApiKey(e.target.value);
-                        if (e.target.value.length !== 51) {
-                          setShowSettings(true);
-                          setOpenAPILimit(false);
-                        }
-                      }}
-                    />
-                  </div>
-                )}
-
-
-                {/* add some space above and a thin outline */}
-                <div className="mt-4">
-                  Queries executed: {queryCount} / {openAPILimit ? freeQueries : '∞'}
-                </div>
-
-
-                {
-                  renderButtons({
-                    showLogoutButton: userSignedIn,
-                    showSaveButton: true,
-                    showClearButton: true,
-                    onLogout: handleSignOut,
-                    onSave: handleSave,
-                    onClear: handleClear,
-                  })}
-              </div>
-            )}
-
+            <Settings
+              showSettings={showSettings}
+              setShowSettings={setShowSettings}
+              queryCount={queryCount}
+              setQueryCount={setQueryCount}
+              freeQueries={freeQueries}
+              setFreeQueries={setFreeQueries}
+              openAPILimit={openAPILimit}
+              setOpenAPILimit={setOpenAPILimit}
+              apiKey={apiKey}
+              setApiKey={setApiKey}
+              email={email}
+              setEmail={setEmail}
+              password={password}
+              setPassword={setPassword}
+              userId={userId}
+              setUserId={setUserId}
+              userEmail={userEmail}
+              setUserEmail={setUserEmail}
+              userSignedIn={userSignedIn}
+              setUserSignedIn={setUserSignedIn}
+              userAgeGroup={userAgeGroup}
+              setUserAgeGroup={setUserAgeGroup}
+              userSex={userSex}
+              setUserSex={setUserSex}
+              userFitnessLevel={userFitnessLevel}
+              setUserFitnessLevel={setUserFitnessLevel}
+              userAnythingElse={userAnythingElse}
+              setUserAnythingElse={setUserAnythingElse}
+              userSearchParameters={userSearchParameters}
+              setUserSearchParameters={setUserSearchParameters}
+            />
             {getUserAuthorization() ? (
               <div className="relative w-full mt-4">
                 <IconSearch className="absolute top-3 w-10 left-1 h-6 rounded-full opacity-50 sm:left-3 sm:top-4 sm:h-8" />
@@ -644,6 +368,11 @@ function Home() {
                 </a>{' '}
               </div>
             )}
+            <QueryInfoBox
+              apiKey={apiKey}
+              queriesAllowed={freeQueries}
+              queriesMade={queryCount}
+            />
 
             {loading ? (
               <div className="mt-6 w-full">
