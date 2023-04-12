@@ -53,7 +53,7 @@ function Home() {
   const [freeQueries,setFreeQueries] = useState<number>(1);
   const [openAPILimit,setOpenAPILimit] = useState<boolean>(true);
 
-  const [showSettings,setShowSettings] = useState<boolean>(false);
+  const [showSettings,setShowSettings] = useState<boolean>(true);
   const [showPlans,setShowPlans] = useState(false);
   const [useEmailPassword,setUseEmailPassword] = useState<boolean>(false);
   const [useAPIKey,setUseAPIKey] = useState<boolean>(false);
@@ -459,7 +459,10 @@ function Home() {
                 ))}
               </div>
             ) : (
-              <div className="mt-6 text-center text-lg">{`AI-powered search and chat for the Huberman Lab podcast.`}</div>
+              <div>
+                <div className="mt-6 text-center text-lg">{`AI-powered search and chat for the Huberman Lab podcast.`}</div>
+                <div className="mt-2 text-center text-lg">{`Your personal data is only saved on your local device.`}</div>
+              </div>
             )}
           </div>
         </div>

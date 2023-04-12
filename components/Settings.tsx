@@ -195,6 +195,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 console.log("User is signed in:",session.user);
                 setSessionState(session.user);
                 setUserSignedIn(true);
+                setActiveSubGroup(null);
                 setShowSettings(false);
             } else {
                 // The sign-in attempt failed; handle the error here.
@@ -206,6 +207,7 @@ export const Settings: React.FC<SettingsProps> = ({
 
     const handleSignOut = async () => {
         await signOut();
+        setActiveSubGroup(null);
     };
 
 
@@ -260,6 +262,8 @@ export const Settings: React.FC<SettingsProps> = ({
 
             // sign in
             await handleSignIn();
+
+            setActiveSubGroup(null);
         } catch (err: any) {
             console.error('Error:',err.message);
             alert(err.message);
@@ -417,7 +421,7 @@ export const Settings: React.FC<SettingsProps> = ({
                                         <select
                                             className="mt-2 flex cursor-pointer items-center space-x-2 rounded-full border border-zinc-600 px-3 py-1 text-sm hover:opacity-50 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
                                             onChange={(e) => handleAgeGroupChange(e)}
-                                            value={userAgeGroup}
+                                            value={userAgeGroup ? userAgeGroup : "25-35"}
                                         >
                                             <option value="<25">{"<25"}</option>
                                             <option value="25-35">25-35</option>
@@ -437,10 +441,10 @@ export const Settings: React.FC<SettingsProps> = ({
                                         <select
                                             className="mt-2 flex cursor-pointer items-center space-x-2 rounded-full border border-zinc-600 px-3 py-1 text-sm hover:opacity-50 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
                                             onChange={(e) => handleSexChange(e)}
-                                            value={userSex}
+                                            value={userSex ? userSex : "Female"}
                                         >
-                                            <option value="Male">Male</option>
                                             <option value="Female">Female</option>
+                                            <option value="Male">Male</option>
                                             <option value="Non-Binary">Non-Binary</option>
                                         </select>
                                     </div>
@@ -455,8 +459,9 @@ export const Settings: React.FC<SettingsProps> = ({
                                         <select
                                             className="mt-2 flex cursor-pointer items-center space-x-2 rounded-full border border-zinc-600 px-3 py-1 text-sm hover:opacity-50 text-black shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
                                             onChange={(e) => handleFitnessLevelChange(e)}
-                                            value={userFitnessLevel}
+                                            value={userFitnessLevel ? userFitnessLevel : "Moderate"}
                                         >
+                                            <option value="Moderate">Moderate</option>
                                             <option value="Active">Active</option>
                                             <option value="Inactive">Inactive</option>
                                         </select>
