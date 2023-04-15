@@ -486,19 +486,19 @@ export const Settings: React.FC<SettingsProps> = ({
                         content: (
                             <div>
                                 <SubGroupButton
-                                    title="High-Level"
-                                    style={userSearchParameters == "Highlevel" ? "bg-red-600" : "bg-red-400"}
-                                    onClick={() => setUserSearchParameters("Highlevel")}
+                                    title="Default"
+                                    style={userSearchParameters == "Default" ? "bg-red-600" : "bg-red-400"}
+                                    onClick={() => setUserSearchParameters("Default")}
+                                />
+                                <SubGroupButton
+                                    title="Protocol"
+                                    style={userSearchParameters == "Protocol" ? "bg-red-600" : "bg-red-400"}
+                                    onClick={() => setUserSearchParameters("Protocol")}
                                 />
                                 <SubGroupButton
                                     title="Detailed"
                                     style={userSearchParameters == "Detail" ? "bg-red-600" : "bg-red-400"}
                                     onClick={() => setUserSearchParameters("Detail")}
-                                />
-                                <SubGroupButton
-                                    title="Pros v Cons"
-                                    style={userSearchParameters == "ProsVCons" ? "bg-red-600" : "bg-red-400"}
-                                    onClick={() => setUserSearchParameters("ProsVCons")}
                                 />
                             </div>
                         ),

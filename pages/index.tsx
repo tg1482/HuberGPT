@@ -72,7 +72,7 @@ function Home() {
   const [userSex,setUserSex] = useState("");
   const [userFitnessLevel,setUserFitnessLevel] = useState("");
   const [userAnythingElse,setUserAnythingElse] = useState("");
-  const [userSearchParameters,setUserSearchParameters] = useState<string>("Highlevel");
+  const [userSearchParameters,setUserSearchParameters] = useState<string>("Default");
 
   const router = useRouter();
 
@@ -158,7 +158,7 @@ function Home() {
   const handleAnswer = async () => {
 
     // User profile
-    let userProfile = ""
+    let userProfile = "This is the profile of the user you're helping: "
     if (userAgeGroup) {
       userProfile = userProfile + `I'm a ${userAgeGroup} year old. `;
     }
@@ -173,11 +173,25 @@ function Home() {
     }
 
     // Search Parameters
-    let searchSettings = "I am looking for a high level overview of the topic. Keep your answer about 5 sentences long.";
+    let searchSettings = "I am looking for a high level overview of the topic. Keep your answer about 7 sentences long. Highlight the important parts in bold.";
     if (userSearchParameters === "Detail") {
-      searchSettings = `I am looking for a detailed answer to my question. Start with the background and then give me arguments that support and go against. Keep your answer about 10 sentences long.`;
-    } else if (userSearchParameters === "ProsVCons") {
-      searchSettings = `Give me a detailed Pros and Cons comparision of the topic. Keep your answer about 10 sentences long.`;
+      searchSettings = `You will give a detailed response to the question, but not too scientific. Break your response into:
+                        1. Background in one paragraph
+                        2. Main response in one paragraph
+                        3. Counter argument in one paragraph
+                        4. And final takeaway in one paragraph.
+                        5. In the end, remind that you are a bot and that you are not Professor Andrew Huberman.
+                        Highlight the important parts in bold.`;
+    }
+    else if (userSearchParameters === "Protocol" || query.toLowerCase().includes("protocol")) {
+      searchSettings = `I am looking for a detailed protocol for the topic. Break your response into:
+                        1. Background in one paragraph
+                        2. The protocol in bullet points
+                        3. Recommendations on the protocol in bullet points
+                        4. Cautions on the protocol in bullet points
+                        5. And final takeaway in one paragraph.
+                        6. In the end, remind that you are a bot and that you are not Professor Andrew Huberman.
+                        Highlight the important parts in bold.`;
     }
 
     // save query to db using save-query endpoint
@@ -193,13 +207,15 @@ function Home() {
     setChunks([]);
     setLoading(true);
 
+    const vector_db_search_query = userProfile ? `${userProfile} ${query}` : query;
+
     // Similarity search for relevant chunks 
     const search_results = await fetch("/api/search",{
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ query })
+      body: JSON.stringify({ query: vector_db_search_query })
     });
 
     if (!search_results.ok) {
@@ -210,7 +226,16 @@ function Home() {
     setChunks(results);
 
     // Prompt for LLM summarization
-    const prompt = `You are a helpful assistant that accurately answers queries using Andrew Huberman podcast episodes. Use the text provided to form your answer, but avoid copying word-for-word from the posts. Try to use your own words when possible. Use the following passages to provide an answer to the query: "${query}". Tailor the response to the user's profile: "${userProfile}". ${searchSettings}.`
+    const prompt = `Follow these rules of engagement:
+                    1. You are a helpful assistant that accurately answers queries using Andrew Huberman podcast episodes. 
+                    2. You will provide an answer to the user's query: "${query}". 
+                    3. ${searchSettings}
+                    4. Return your response in Markdown format only. It should be well formatted with bold, italics, and bullet points where appropriate.
+                    
+                    Use the following information to help you answer the question:
+                    1. Use the text provided to form your answer, but avoid copying word-for-word from the posts.
+                    2. ${userProfile}.`
+
     const ctrl = new AbortController();
 
     console.log("Prompt",prompt);
@@ -247,7 +272,6 @@ function Home() {
         throw new Error(update_query_count.statusText);
       }
     };
-
   };
 
 
