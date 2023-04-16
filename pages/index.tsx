@@ -171,16 +171,16 @@ function Home() {
     let searchSettings = "I am looking for a high level overview of the topic. Keep your answer about 7 sentences long. Highlight the important parts in bold.";
     if (userSearchParameters === "Detail") {
       searchSettings = `You will give a detailed response to the question, but not too scientific. Break your response into:
-                        1. Background in one paragraph
-                        2. Main response in one paragraph
-                        3. And final takeaway in one paragraph.
+                        1. Background in upto 4 sentences.
+                        2. Main response in upto 5 sentences.
+                        3. And final takeaway in upto 3 sentences.
                         Highlight the important parts in bold.`;
     }
     else if (userSearchParameters === "Protocol" || query.toLowerCase().includes("protocol")) {
       searchSettings = `I am looking for a detailed protocol for the topic. Break your response into:
-                        1. Background in one paragraph
-                        2. The protocol in bullet points
-                        3. Cautions on the protocol in bullet points
+                        1. Background in upto 4 sentences.
+                        2. The protocol in upto 5 bullet points
+                        3. Cautions on the protocol in upto 3 bullet points
                         Highlight the important parts in bold.`;
     }
 
