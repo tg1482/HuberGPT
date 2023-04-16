@@ -48,7 +48,7 @@ export default async function handler(
   // Heartbeat
   const heartbeatInterval = setInterval(() => {
     res.write(':heartbeat\n');
-  },8 * 1000); // Send heartbeat every 8 seconds
+  },5 * 1000); // Send heartbeat every 5 seconds
 
   const testRegex = /testing|test|test123/;
   if (testRegex.test(prompt)) {
