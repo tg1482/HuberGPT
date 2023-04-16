@@ -240,7 +240,7 @@ function Home() {
 
     console.log("Prompt",prompt);
 
-    fetchEventSource("/api/vectordbqa",{
+    await fetchEventSource("/api/vectordbqa",{
       method: "POST",
       headers: {
         "Content-Type": "application/json"
