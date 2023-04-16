@@ -45,10 +45,16 @@ export default async function handler(
     res.write(`data: ${data}\n\n`);
   };
 
+  // Heartbeat
+  const heartbeatInterval = setInterval(() => {
+    res.write(':heartbeat\n');
+  },15 * 1000); // Send heartbeat every 15 seconds
+
   const testRegex = /testing|test|test123/;
   if (testRegex.test(prompt)) {
     sendData(JSON.stringify({ data: "test answer" }));
     sendData(JSON.stringify({ data: "DONE" }));
+    clearInterval(heartbeatInterval);
     res.end();
     return;
   }
@@ -62,8 +68,7 @@ export default async function handler(
         sendData(JSON.stringify({ data: token }));
       },
     }),
-  }
-  );
+  });
 
   const chain = VectorDBQAChain.fromLLM(model,vectorStore);
   chain.returnSourceDocuments = false;
@@ -78,6 +83,7 @@ export default async function handler(
     console.log("Error in LLM, sending DONE and closing connection")
   } finally {
     sendData(JSON.stringify({ data: "DONE" }));
+    clearInterval(heartbeatInterval);
     res.end();
   }
 }
