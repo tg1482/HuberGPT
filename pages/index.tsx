@@ -2,7 +2,7 @@ import { Answer } from "@/components/Answer/Answer";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
 import { Settings } from "@/components/Settings";
-import { HuberbotChunk,DefaultSession } from "@/types";
+import { HuberbotChunk,DefaultSession,ApiCallInput,ApiCallOutput } from "@/types";
 import { IconArrowRight,IconExternalLink,IconSearch } from "@tabler/icons-react";
 import Head from "next/head";
 import Image from "next/image";
@@ -185,13 +185,8 @@ function Home() {
     }
 
     // save query to db using save-query endpoint
-    const save_query = await fetch("/api/save-query",{
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ query,userId })
-    });
+    const save_query_response = await apiCall("/api/save-query",{ query,userId });
+    const { queryId } = await save_query_response.json();
 
     setAnswer("");
     setChunks([]);
@@ -200,20 +195,14 @@ function Home() {
     const vector_db_search_query = userProfile ? `${userProfile} ${query}` : query;
 
     // Similarity search for relevant chunks 
-    const search_results = await fetch("/api/search",{
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ query: vector_db_search_query })
-    });
-
+    const search_results = await apiCall("/api/search",{ query: vector_db_search_query });
     if (!search_results.ok) {
       setLoading(false);
       throw new Error(search_results.statusText);
     }
     const results: HuberbotChunk[] = await search_results.json();
     setChunks(results);
+
 
     // Prompt for LLM summarization
     const prompt = `Follow these rules of engagement:
@@ -239,8 +228,11 @@ function Home() {
         const data = JSON.parse(event.data);
         if (data.data === "DONE") {
           // Request complete 
-          setAnswer((prev) => prev + `  \n \n Note: I am an AI language model and not Professor Andrew Huberman.`);
-          postCompletion(apiKey,queryCount);
+          setAnswer((prev) => {
+            const updatedAnswer = prev + `  \n \n Note: I am an AI language model and not Professor Andrew Huberman.`;
+            postCompletion(apiKey,queryCount,queryId,() => updatedAnswer);
+            return updatedAnswer;
+          })
         } else {
           // Stream text
           setAnswer((prev) => prev + data.data);
@@ -248,19 +240,6 @@ function Home() {
       }
     });
 
-    if (userId !== -99) {
-      // Update the query count in the database
-      const update_query_count = await fetch("/api/update-query-count",{
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ userId })
-      });
-      if (!update_query_count.ok) {
-        throw new Error(update_query_count.statusText);
-      }
-    };
   };
 
 
@@ -274,10 +253,42 @@ function Home() {
   };
 
 
-  const postCompletion = (apiKey: string,queryCount: number) => {
+  const postCompletion = async (apiKey: string,queryCount: number,queryId: number,getAnswer: () => string) => {
+    const answer = getAnswer();
+
     setQueryCount(queryCount + 1);
     localStorage.setItem("HGPT_QUERY_COUNT",queryCount.toString());
-  }
+    console.log(answer);
+
+    if (userId !== -99) {
+      // Update the query count in the database
+      await apiCall("/api/update-query-count",{ userId });
+    }
+
+    if (answer.length > 0 && answer !== "test answer") {
+      try {
+        await apiCall("/api/save-answer",{ answer,queryId });
+      } catch (error) {
+        console.error("Error saving answer:",error);
+      }
+    }
+  };
+
+  const apiCall = async (endpoint: string,data: ApiCallInput): Promise<ApiCallOutput> => {
+    const response = await fetch(endpoint,{
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      throw new Error(response.statusText);
+    }
+
+    return response;
+  };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {

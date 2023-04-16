@@ -24,3 +24,12 @@ interface Metadata {
   title: string;
   link: string;
 }
+
+
+export interface ApiCallInput {
+  [key: string]: any;
+}
+
+export interface ApiCallOutput {
+  [key: string]: any;
+}

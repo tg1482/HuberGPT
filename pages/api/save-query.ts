@@ -11,10 +11,12 @@ export default async function handler(
             const { query,userId } = req.body;
 
             const [rows] = await pool.query<RowDataPacket[]>(
-                'INSERT INTO QueryFact (userId, content, createdAt) VALUES (?, ?, ?)',
-                [userId,query,new Date()]
+                'INSERT INTO QueryFact (userId, content, createdAt, answer) VALUES (?, ?, ?, ?)',
+                [userId,query,new Date(),'']
             );
-            return res.status(201).json({ message: 'Query saved successfully',data: rows });
+            const queryId = (rows as any).insertId;
+
+            return res.status(201).json({ message: 'Query saved successfully',queryId: queryId });
         } catch (err) {
             console.error(err);
             return res.status(500).json({ error: 'Internal Server Error' });

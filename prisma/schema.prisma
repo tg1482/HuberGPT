@@ -23,6 +23,7 @@ model QueryFact {
   createdAt     DateTime @default(now())
   user          UserDimension? @relation(fields: [userId], references: [id])
   userId        Int?      @default(-99)
+  answer        String?   @default("")
 }
 
 model SubscriptionFact {
