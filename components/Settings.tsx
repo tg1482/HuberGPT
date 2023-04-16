@@ -86,7 +86,6 @@ export const Settings: React.FC<SettingsProps> = ({
     const [activeSubGroup,setActiveSubGroup] = useState<string | null>(null);
 
     const setSessionState = async (user: any) => {
-        console.log("Setting stage",user)
         if (user) {
             if (user.id !== -99) {
                 const response = await fetch(`/api/get-query-counts?userId=${user.id}`);
@@ -186,13 +185,11 @@ export const Settings: React.FC<SettingsProps> = ({
         });
 
         if (result?.error) {
-            console.log(result.error);
             alert("Incorrect email or password");
         } else {
             const session = await getSession();
             if (session) {
                 // The user is now signed in; handle the signed-in state here.
-                console.log("User is signed in:",session.user);
                 setSessionState(session.user);
                 setUserSignedIn(true);
                 setActiveSubGroup(null);
@@ -240,8 +237,6 @@ export const Settings: React.FC<SettingsProps> = ({
                 throw new Error(error.error);
             }
 
-            console.log('User created successfully!');
-
             const responseBody = await response.json();
             const userId = parseInt(responseBody.userId);
 
@@ -257,8 +252,6 @@ export const Settings: React.FC<SettingsProps> = ({
             const userId = await signUp(email,password);
 
             await createSubscription(1,userId);
-
-            console.log('Subscription created successfully!');
 
             // sign in
             await handleSignIn();

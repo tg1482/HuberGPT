@@ -78,10 +78,7 @@ function Home() {
 
   const { data: session } = useSession();
 
-  console.log(session);
-
   const setSessionState = async (user: any) => {
-    console.log("Setting stage",user)
     if (user) {
       if (user.id !== -99) {
         const response = await fetch(`/api/get-query-counts?userId=${user.id}`);
@@ -142,7 +139,6 @@ function Home() {
   // Save session with the latest values when the user leaves the tab
   useEffect(() => {
     const saveSession = () => {
-      console.log("Saving session");
       if (userId == -99 && session) {
         sessionStorage.setItem(
           "session",
@@ -151,7 +147,6 @@ function Home() {
       }
     };
     saveSession();
-    console.log(userAgeGroup,userSex,userFitnessLevel,userAnythingElse);
   },[freeQueries,queryCount,session,userId]);
 
   // Handle answer 
@@ -178,19 +173,14 @@ function Home() {
       searchSettings = `You will give a detailed response to the question, but not too scientific. Break your response into:
                         1. Background in one paragraph
                         2. Main response in one paragraph
-                        3. Counter argument in one paragraph
-                        4. And final takeaway in one paragraph.
-                        5. In the end, remind that you are a bot and that you are not Professor Andrew Huberman.
+                        3. And final takeaway in one paragraph.
                         Highlight the important parts in bold.`;
     }
     else if (userSearchParameters === "Protocol" || query.toLowerCase().includes("protocol")) {
       searchSettings = `I am looking for a detailed protocol for the topic. Break your response into:
                         1. Background in one paragraph
                         2. The protocol in bullet points
-                        3. Recommendations on the protocol in bullet points
-                        4. Cautions on the protocol in bullet points
-                        5. And final takeaway in one paragraph.
-                        6. In the end, remind that you are a bot and that you are not Professor Andrew Huberman.
+                        3. Cautions on the protocol in bullet points
                         Highlight the important parts in bold.`;
     }
 
@@ -238,8 +228,6 @@ function Home() {
 
     const ctrl = new AbortController();
 
-    console.log("Prompt",prompt);
-
     await fetchEventSource("/api/vectordbqa",{
       method: "POST",
       headers: {
@@ -251,6 +239,7 @@ function Home() {
         const data = JSON.parse(event.data);
         if (data.data === "DONE") {
           // Request complete 
+          setAnswer((prev) => prev + `  \n \n Note: I am an AI language model and not Professor Andrew Huberman.`);
           postCompletion(apiKey,queryCount);
         } else {
           // Stream text
