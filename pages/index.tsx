@@ -149,11 +149,9 @@ function Home() {
     saveSession();
   },[freeQueries,queryCount,session,userId]);
 
-  // Handle answer 
-  const handleAnswer = async () => {
-
-    // User profile
-    let userProfile = "This is the profile of the user you're helping: "
+  // Generate user profile
+  const generateUserProfile = () => {
+    let userProfile = "This is the profile of the user you're helping: ";
     if (userAgeGroup) {
       userProfile = userProfile + `I'm a ${userAgeGroup} year old. `;
     }
@@ -166,46 +164,38 @@ function Home() {
     if (userAnythingElse) {
       userProfile = userProfile + ` ${userAnythingElse}`;
     }
+    return userProfile;
+  };
 
-    // Search Parameters
+  // Generate search settings
+  const generateSearchSettings = () => {
     let searchSettings = "I am looking for a high level overview of the topic. Keep your answer about 7 sentences long. Highlight the important parts in bold.";
     if (userSearchParameters === "Detail") {
       searchSettings = `You will give a detailed response to the question, but not too scientific. Break your response into:
-                        1. Background in upto 4 sentences.
-                        2. Main response in upto 5 sentences.
-                        3. And final takeaway in upto 3 sentences.
-                        Highlight the important parts in bold.`;
+                      1. Background in upto 4 sentences.
+                      2. Main response in upto 5 sentences.
+                      3. And final takeaway in upto 3 sentences.
+                      Highlight the important parts in bold.`;
     }
     else if (userSearchParameters === "Protocol" || query.toLowerCase().includes("protocol")) {
       searchSettings = `I am looking for a detailed protocol for the topic. Break your response into:
-                        1. Background in upto 4 sentences.
-                        2. The protocol in upto 5 bullet points
-                        3. Cautions on the protocol in upto 3 bullet points
-                        Highlight the important parts in bold.`;
+                      1. Background in upto 4 sentences.
+                      2. The protocol in upto 5 bullet points
+                      3. Cautions on the protocol in upto 3 bullet points
+                      Highlight the important parts in bold.`;
     }
+    return searchSettings;
+  };
 
-    // save query to db using save-query endpoint
-    const save_query_response = await apiCall("/api/save-query",{ query,userId });
-    const { queryId } = await save_query_response.json();
+  const getPrompts = (userProfile: string,searchSettings: string,query: string) => {
+    let source_search_prompt: string = "";
+    let vector_db_qa_prompt: string = "";
 
-    setAnswer("");
-    setChunks([]);
-    setLoading(true);
+    // Query to display chuncks of text
+    source_search_prompt = userProfile ? `${userProfile} ${query}` : query;
 
-    const vector_db_search_query = userProfile ? `${userProfile} ${query}` : query;
-
-    // Similarity search for relevant chunks 
-    const search_results = await apiCall("/api/search",{ query: vector_db_search_query });
-    if (!search_results.ok) {
-      setLoading(false);
-      throw new Error(search_results.statusText);
-    }
-    const results: HuberbotChunk[] = await search_results.json();
-    setChunks(results);
-
-
-    // Prompt for LLM summarization
-    const prompt = `Follow these rules of engagement:
+    // Query for GPT to answer
+    vector_db_qa_prompt = `Follow these rules of engagement:
                     1. You are a helpful assistant that accurately answers queries using Andrew Huberman podcast episodes. 
                     2. You will provide an answer to the user's query: "${query}". 
                     3. ${searchSettings}
@@ -215,14 +205,44 @@ function Home() {
                     1. Use the text provided to form your answer, but avoid copying word-for-word from the posts.
                     2. ${userProfile}.`
 
+    return { source_search_prompt,vector_db_qa_prompt };
+  }
+
+
+  // Handle answer 
+  const handleAnswer = async () => {
+
+    // Get prompt
+    let userProfile = generateUserProfile();
+    let searchSettings = generateSearchSettings();
+    const { source_search_prompt,vector_db_qa_prompt } = getPrompts(userProfile,searchSettings,query);
+
+    // save query to db using save-query endpoint
+    const save_query_response = await apiCall("/api/save-query",{ query,userId });
+    const { queryId } = await save_query_response.json();
+
+    setAnswer("");
+    setChunks([]);
+    setLoading(true);
+
+    // Similarity search for relevant chunks 
+    const search_results = await apiCall("/api/search",{ query: source_search_prompt });
+    if (!search_results.ok) {
+      setLoading(false);
+      throw new Error(search_results.statusText);
+    }
+    const results: HuberbotChunk[] = await search_results.json();
+    setChunks(results);
+
     const ctrl = new AbortController();
 
+    // Ask GPT to answer
     await fetchEventSource("/api/vectordbqa",{
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ prompt,apiKey }),
+      body: JSON.stringify({ prompt: vector_db_qa_prompt,apiKey: apiKey }),
       onmessage: (event) => {
         setLoading(false);
         const data = JSON.parse(event.data);
