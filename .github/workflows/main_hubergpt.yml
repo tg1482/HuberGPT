@@ -26,7 +26,7 @@ jobs:
 
       - name: Create artifact archive
         run: |
-          tar -czvf node-app.tar.gz .
+          tar --verbose --exclude='.DS_Store' -czvf node-app.tar.gz .
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v2
