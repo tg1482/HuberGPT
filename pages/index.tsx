@@ -11,32 +11,9 @@ import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { signIn, signOut, getSession, useSession, SessionProvider, getCsrfToken } from "next-auth/react";
 import { Session } from "next-auth";
 import { useRouter } from "next/router";
+import { GetServerSidePropsContext } from "next";
 
-// Default session
-
-const defaultSession = {
-  user: {
-    id: -99,
-    email: null,
-    queriesAllowed: 2,
-    queriesMade: 0,
-  },
-  expires: new Date().toISOString(),
-};
-
-type HubergptSession = Session | DefaultSession;
-
-function HomeWrapper({ session }: { session: HubergptSession }) {
-  return (
-    <SessionProvider session={session ? session : defaultSession}>
-      <Home />
-    </SessionProvider>
-  );
-}
-
-export default HomeWrapper;
-
-function Home() {
+export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [query, setQuery] = useState<string>("");
@@ -435,4 +412,14 @@ function Home() {
       </div>
     </>
   );
+}
+
+export async function getServerSideProps(context: GetServerSidePropsContext) {
+  const session = await getSession(context);
+
+  return {
+    props: {
+      session,
+    },
+  };
 }
