@@ -5,9 +5,9 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "**"
-      }
-    ]
+        hostname: "**",
+      },
+    ],
   },
   env: {
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
@@ -20,7 +20,6 @@ const nextConfig = {
     NEXT_PUBLIC_STRIPE_KEY: process.env.NEXT_PUBLIC_STRIPE_KEY,
   },
   webpack: (config, { isServer }) => {
-
     // If client-side, don't polyfill `fs`
     if (!isServer) {
       config.resolve.fallback = {

@@ -2,35 +2,34 @@ import { Answer } from "@/components/Answer/Answer";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
 import { Settings } from "@/components/Settings";
-import { HuberbotChunk, DefaultSession } from "@/types";
-import { IconArrowRight, IconExternalLink, IconSearch } from "@tabler/icons-react";
+import { Search } from "@/components/Search";
+import { Chunks } from "@/components/Chunks";
+import { HuberbotChunk, UserProfile } from "@/types";
 import Head from "next/head";
-import Image from "next/image";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
-import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { signIn, signOut, getSession, useSession, SessionProvider, getCsrfToken } from "next-auth/react";
-import { Session } from "next-auth";
+import { getSession, useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { GetServerSidePropsContext } from "next";
+
+const defaultUserProfile: UserProfile = {
+  ageGroup: "",
+  sex: "",
+  fitnessLevel: "",
+  anythingElse: "",
+  searchParameters: "Default",
+};
 
 export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [query, setQuery] = useState<string>("");
   const [chunks, setChunks] = useState<HuberbotChunk[]>([]);
   const [answer, setAnswer] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const [mode, setMode] = useState<"search" | "chat">("chat");
   const [queryCount, setQueryCount] = useState<number>(0);
   const [freeQueries, setFreeQueries] = useState<number>(1);
-  const [openAPILimit, setOpenAPILimit] = useState<boolean>(true);
 
   const [showSettings, setShowSettings] = useState<boolean>(true);
-  const [showPlans, setShowPlans] = useState(false);
-  const [useEmailPassword, setUseEmailPassword] = useState<boolean>(false);
-  const [useAPIKey, setUseAPIKey] = useState<boolean>(false);
 
   const [apiKey, setApiKey] = useState<string>("");
   const [email, setEmail] = useState("");
@@ -47,6 +46,7 @@ export default function Home() {
   const [userFitnessLevel, setUserFitnessLevel] = useState("");
   const [userAnythingElse, setUserAnythingElse] = useState("");
   const [userSearchParameters, setUserSearchParameters] = useState<string>("Default");
+  const [userProfile, setUserProfile] = useState<UserProfile>(defaultUserProfile);
 
   const router = useRouter();
 
@@ -93,19 +93,16 @@ export default function Home() {
     if (PG_KEY) {
       setApiKey(PG_KEY);
     }
-    if (USER_AGE) {
-      setUserAgeGroup(USER_AGE);
-    }
-    if (USER_SEX) {
-      setUserSex(USER_SEX);
-    }
-    if (USER_FITNESS_LEVEL) {
-      setUserFitnessLevel(USER_FITNESS_LEVEL);
-    }
-    if (USER_ADDITIONAL_INFO) {
-      setUserAnythingElse(USER_ADDITIONAL_INFO);
-    }
+    setUserProfile((prevProfile) => ({
+      ...prevProfile,
+      ageGroup: USER_AGE || prevProfile.ageGroup,
+      sex: USER_SEX || prevProfile.sex,
+      fitnessLevel: USER_FITNESS_LEVEL || prevProfile.fitnessLevel,
+      anythingElse: USER_ADDITIONAL_INFO || prevProfile.anythingElse,
+    }));
+
     setUserAuthorized(getUserAuthorization());
+
     inputRef.current?.focus();
   }, []);
 
@@ -122,119 +119,6 @@ export default function Home() {
     saveSession();
   }, [freeQueries, queryCount, session, userId]);
 
-  // Handle answer
-  const handleAnswer = async () => {
-    // User profile
-    let userProfile = "This is the profile of the user you're helping: ";
-    if (userAgeGroup) {
-      userProfile = userProfile + `I'm a ${userAgeGroup} year old. `;
-    }
-    if (userSex) {
-      userProfile = userProfile + `I am a ${userSex}. `;
-    }
-    if (userFitnessLevel) {
-      userProfile = userProfile + `I am ${userFitnessLevel} in fitness. `;
-    }
-    if (userAnythingElse) {
-      userProfile = userProfile + ` ${userAnythingElse}`;
-    }
-
-    // Search Parameters
-    let searchSettings =
-      "I am looking for a high level overview of the topic. Keep your answer about 7 sentences long. Highlight the important parts in bold.";
-    if (userSearchParameters === "Detail") {
-      searchSettings = `You will give a detailed response to the question, but not too scientific. Break your response into:
-                        1. Background in upto 4 sentences.
-                        2. Main response in upto 5 sentences.
-                        3. And final takeaway in upto 3 sentences.
-                        Highlight the important parts in bold.`;
-    } else if (userSearchParameters === "Protocol" || query.toLowerCase().includes("protocol")) {
-      searchSettings = `I am looking for a detailed protocol for the topic. Break your response into:
-                        1. Background in upto 4 sentences.
-                        2. The protocol in upto 5 bullet points
-                        3. Cautions on the protocol in upto 3 bullet points
-                        Highlight the important parts in bold.`;
-    }
-
-    // save query to db using save-query endpoint
-    const save_query = await fetch("/api/save-query", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ query, userId }),
-    });
-
-    setAnswer("");
-    setChunks([]);
-    setLoading(true);
-
-    const vector_db_search_query = userProfile ? `${userProfile} ${query}` : query;
-
-    // Similarity search for relevant chunks
-    const search_results = await fetch("/api/search", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ query: vector_db_search_query }),
-    });
-
-    if (!search_results.ok) {
-      setLoading(false);
-      throw new Error(search_results.statusText);
-    }
-    const results: HuberbotChunk[] = await search_results.json();
-    setChunks(results);
-
-    // Prompt for LLM summarization
-    const prompt = `Follow these rules of engagement:
-                    1. You are a helpful assistant that accurately answers queries using Andrew Huberman podcast episodes. 
-                    2. You will provide an answer to the user's query: "${query}". 
-                    3. ${searchSettings}
-                    4. Return your response in Markdown format only. It should be well formatted with bold, italics, and bullet points where appropriate.
-                    
-                    Use the following information to help you answer the question:
-                    1. Use the text provided to form your answer, but avoid copying word-for-word from the posts.
-                    2. ${userProfile}.`;
-
-    const ctrl = new AbortController();
-
-    await fetchEventSource("/api/vectordbqa", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ prompt, apiKey }),
-      onmessage: (event) => {
-        setLoading(false);
-        const data = JSON.parse(event.data);
-        if (data.data === "DONE") {
-          // Request complete
-          setAnswer((prev) => prev + `  \n \n Note: I am an AI language model and not Professor Andrew Huberman.`);
-          postCompletion(apiKey, queryCount);
-        } else {
-          // Stream text
-          setAnswer((prev) => prev + data.data);
-        }
-      },
-    });
-
-    if (userId !== -99) {
-      // Update the query count in the database
-      const update_query_count = await fetch("/api/update-query-count", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ userId }),
-      });
-      if (!update_query_count.ok) {
-        throw new Error(update_query_count.statusText);
-      }
-    }
-  };
-
   const getUserAuthorization = () => {
     if (queryCount < freeQueries) {
       return true;
@@ -242,17 +126,6 @@ export default function Home() {
       return true;
     }
     return false;
-  };
-
-  const postCompletion = (apiKey: string, queryCount: number) => {
-    setQueryCount(queryCount + 1);
-    localStorage.setItem("HGPT_QUERY_COUNT", queryCount.toString());
-  };
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleAnswer();
-    }
   };
 
   interface QueryInfoBoxProps {
@@ -291,8 +164,6 @@ export default function Home() {
               setQueryCount={setQueryCount}
               freeQueries={freeQueries}
               setFreeQueries={setFreeQueries}
-              openAPILimit={openAPILimit}
-              setOpenAPILimit={setOpenAPILimit}
               apiKey={apiKey}
               setApiKey={setApiKey}
               email={email}
@@ -305,30 +176,21 @@ export default function Home() {
               setUserEmail={setUserEmail}
               userSignedIn={userSignedIn}
               setUserSignedIn={setUserSignedIn}
-              userAgeGroup={userAgeGroup}
-              setUserAgeGroup={setUserAgeGroup}
-              userSex={userSex}
-              setUserSex={setUserSex}
-              userFitnessLevel={userFitnessLevel}
-              setUserFitnessLevel={setUserFitnessLevel}
-              userAnythingElse={userAnythingElse}
-              setUserAnythingElse={setUserAnythingElse}
-              userSearchParameters={userSearchParameters}
-              setUserSearchParameters={setUserSearchParameters}
+              userProfile={userProfile}
+              setUserProfile={setUserProfile}
             />
             {getUserAuthorization() ? (
-              <div className="relative w-full mt-4">
-                <IconSearch className="absolute top-3 w-10 left-1 h-6 rounded-full opacity-50 sm:left-3 sm:top-4 sm:h-8" />
-                <input
-                  ref={inputRef}
-                  className="h-12 w-full rounded-full border border-zinc-600 pr-12 pl-11 focus:border-zinc-800 focus:outline-none focus:ring-1 focus:ring-zinc-800 sm:h-16 sm:py-2 sm:pr-16 sm:pl-16 sm:text-lg"
-                  type="text"
-                  placeholder="How much water should one consume?"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                />
-              </div>
+              <Search
+                apiKey={apiKey}
+                userId={userId}
+                queryCount={queryCount}
+                setQueryCount={setQueryCount}
+                userProfile={userProfile}
+                setUserProfile={setUserProfile}
+                setAnswer={setAnswer}
+                setChunks={setChunks}
+                setLoading={setLoading}
+              />
             ) : (
               <div className="text-center font-bold text-3xl mt-7">
                 Kindly authenticate using Login or OpenAI API Key in{" "}
@@ -354,52 +216,10 @@ export default function Home() {
               <div className="mt-6">
                 <div className="font-bold text-2xl mb-2">Answer</div>
                 <Answer text={answer} />
-
-                <div className="mt-6 mb-16">
-                  <div className="font-bold text-2xl">Passages</div>
-
-                  {chunks.map((chunk, index) => (
-                    <div key={index}>
-                      <div className="mt-4 border border-zinc-600 rounded-lg p-4">
-                        <div className="flex justify-between">
-                          <div className="flex items-center">
-                            <Image className="rounded-lg" src={"/" + chunk.metadata.id + ".jpg"} width={103} height={70} alt={chunk.metadata.title} />
-                            <div className="ml-4">
-                              <div className="font-bold text-xl">{chunk.metadata.title}</div>
-                            </div>
-                          </div>
-                          <a className="hover:opacity-50 ml-4" href={chunk.metadata.link} target="_blank" rel="noreferrer">
-                            <IconExternalLink />
-                          </a>
-                        </div>
-                        <div className="mt-4">{chunk.pageContent}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <Chunks chunks={chunks} />
               </div>
             ) : chunks.length > 0 ? (
-              <div className="mt-6 pb-16">
-                <div className="font-bold text-2xl">Passages</div>
-                {chunks.map((chunk, index) => (
-                  <div key={index}>
-                    <div className="mt-4 border border-zinc-600 rounded-lg p-4">
-                      <div className="flex justify-between">
-                        <div className="flex items-center">
-                          <Image className="rounded-lg" src={"/" + chunk.metadata.id + ".jpg"} width={103} height={70} alt={chunk.metadata.title} />
-                          <div className="ml-4">
-                            <div className="font-bold text-xl">{chunk.metadata.title}</div>
-                          </div>
-                        </div>
-                        <a className="hover:opacity-50 ml-2" href={chunk.metadata.link} target="_blank" rel="noreferrer">
-                          <IconExternalLink />
-                        </a>
-                      </div>
-                      <div className="mt-4">{chunk.pageContent}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <Chunks chunks={chunks} />
             ) : (
               <div>
                 <div className="mt-6 text-center text-lg">{`AI-powered search and chat for the Huberman Lab podcast.`}</div>

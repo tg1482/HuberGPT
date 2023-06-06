@@ -1,5 +1,5 @@
 export enum OpenAIModel {
-  DAVINCI_TURBO = "gpt-3.5-turbo"
+  DAVINCI_TURBO = "gpt-3.5-turbo",
 }
 
 export type HuberbotChunk = {
@@ -17,10 +17,18 @@ export interface DefaultSession {
     queriesMade: number;
   };
   expires: string;
-};
+}
 
 interface Metadata {
   id: string;
   title: string;
   link: string;
 }
+
+export type UserProfile = {
+  ageGroup: string;
+  sex: string;
+  fitnessLevel: string;
+  anythingElse: string;
+  searchParameters: string;
+};
