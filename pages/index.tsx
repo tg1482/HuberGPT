@@ -41,16 +41,13 @@ export default function Home() {
   const [userAuthorized, setUserAuthorized] = useState<boolean>(false);
 
   // profile
-  const [userAgeGroup, setUserAgeGroup] = useState("");
-  const [userSex, setUserSex] = useState("");
-  const [userFitnessLevel, setUserFitnessLevel] = useState("");
-  const [userAnythingElse, setUserAnythingElse] = useState("");
-  const [userSearchParameters, setUserSearchParameters] = useState<string>("Default");
   const [userProfile, setUserProfile] = useState<UserProfile>(defaultUserProfile);
 
   const router = useRouter();
 
   const { data: session } = useSession();
+
+  console.log("session index", session);
 
   const setSessionState = async (user: any) => {
     if (user) {
@@ -106,7 +103,7 @@ export default function Home() {
     inputRef.current?.focus();
   }, []);
 
-  // Save session with the latest values when the user leaves the tab
+  // Save session with the latest values
   useEffect(() => {
     const saveSession = () => {
       if (userId == -99 && session) {

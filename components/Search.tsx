@@ -155,7 +155,7 @@ export const Search: React.FC<SearchProps> = ({
 
   return (
     <div className="relative w-full mt-4">
-      <IconSearch className="absolute top-3 w-10 left-1 h-6 rounded-full opacity-50 sm:left-3 sm:top-4 sm:h-8" />
+      <i className="pi pi-search absolute text-xl left-7 top-1/2 transform -translate-y-1/2" />
       <input
         className="h-12 w-full rounded-full border border-zinc-600 pr-12 pl-11 focus:border-zinc-800 focus:outline-none focus:ring-1 focus:ring-zinc-800 sm:h-16 sm:py-2 sm:pr-16 sm:pl-16 sm:text-lg"
         type="text"
